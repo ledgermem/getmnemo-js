@@ -1,5 +1,5 @@
 {
-  "name": "@mnemo/memory",
+  "name": "getmnemo",
   "version": "0.1.0",
   "description": "Official TypeScript / JavaScript SDK for Mnemo Memory — long-term memory infrastructure for AI agents.",
   "type": "module",
@@ -31,18 +31,18 @@
     "test:watch": "vitest"
   },
   "keywords": [
+    "mnemo",
     "memory",
-    "llm",
+    "ai",
     "agents",
     "rag",
-    "vector",
-    "longmemeval",
-    "mcp"
+    "sdk",
+    "typescript"
   ],
   "homepage": "https://getmnemo.xyz",
   "repository": {
     "type": "git",
-    "url": "https://github.com/getmnemo/getmnemo-js"
+    "url": "https://github.com/ledgermem/getmnemo-js.git"
   },
   "bugs": {
     "url": "https://github.com/getmnemo/getmnemo-js/issues"
