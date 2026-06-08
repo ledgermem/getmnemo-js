@@ -41,13 +41,13 @@ export type PaginatedMemories = {
 }
 
 export type ClientConfig = {
-  /** Required. Get one at https://app.getmnemo.xyz/settings/api-keys. */
+  /** Required. Get one at https://app.mnemohq.com/settings/api-keys. */
   apiKey: string
   /** Required. Workspace ID from the dashboard URL. */
   workspaceId: string
   /** Optional default actor scope for all calls (overridable per-method). */
   actorId?: string
-  /** Defaults to https://api.getmnemo.xyz. */
+  /** Defaults to https://api.mnemohq.com. */
   baseUrl?: string
   /** Per-request timeout in ms (default 30s). */
   timeoutMs?: number

@@ -26,7 +26,7 @@ import type {
   SearchResponse,
 } from './types.js'
 
-const DEFAULT_BASE_URL = 'https://api.getmnemo.xyz'
+const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
 const SDK_VERSION = '0.1.0'
 const USER_AGENT = `@mnemo/memory/${SDK_VERSION}`

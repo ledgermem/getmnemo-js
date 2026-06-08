@@ -39,7 +39,7 @@
     "sdk",
     "typescript"
   ],
-  "homepage": "https://getmnemo.xyz",
+  "homepage": "https://mnemohq.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/ledgermem/getmnemo-js.git"
