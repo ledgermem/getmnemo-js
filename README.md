@@ -1,9 +1,9 @@
-# @ledgermem/memory
+# getmnemo
 
-Official TypeScript / JavaScript SDK for [LedgerMem Memory](https://proofly.dev) — long-term memory infrastructure for AI agents.
+Official TypeScript / JavaScript SDK for [Mnemo Memory](https://mnemohq.com) — long-term memory infrastructure for AI agents.
 
 ```bash
-npm install @ledgermem/memory
+npm install getmnemo
 ```
 
 Zero runtime dependencies. Works in Node 18+, Bun, Deno, browsers, Cloudflare Workers, and any other modern JS runtime with `fetch`.
@@ -11,11 +11,11 @@ Zero runtime dependencies. Works in Node 18+, Bun, Deno, browsers, Cloudflare Wo
 ## Quickstart
 
 ```ts
-import { LedgerMem } from '@ledgermem/memory'
+import { Mnemo } from 'getmnemo'
 
-const memory = new LedgerMem({
-  apiKey: process.env.LEDGERMEM_API_KEY!,
-  workspaceId: process.env.LEDGERMEM_WORKSPACE_ID!,
+const memory = new Mnemo({
+  apiKey: process.env.GETMNEMO_API_KEY!,
+  workspaceId: process.env.GETMNEMO_WORKSPACE_ID!,
 })
 
 // Store an atomic fact
@@ -40,15 +40,15 @@ for (const hit of hits) {
 
 ## Errors
 
-All HTTP failures throw `LedgerMemHTTPError` with `.status` and `.body`. Aborted requests throw `LedgerMemTimeoutError`. Both inherit from `LedgerMemError`.
+All HTTP failures throw `MnemoHTTPError` with `.status` and `.body`. Aborted requests throw `MnemoTimeoutError`. Both inherit from `MnemoError`.
 
 ```ts
-import { LedgerMem, LedgerMemHTTPError } from '@ledgermem/memory'
+import { Mnemo, MnemoHTTPError } from 'getmnemo'
 
 try {
   await memory.search({ query: 'rice' })
 } catch (err) {
-  if (err instanceof LedgerMemHTTPError && err.status === 401) {
+  if (err instanceof MnemoHTTPError && err.status === 401) {
     console.error('API key rejected:', err.body)
   } else {
     throw err
@@ -60,10 +60,10 @@ try {
 
 | Option | Default | Notes |
 |---|---|---|
-| `apiKey` | (required) | from <https://app.proofly.dev/settings/api-keys> |
+| `apiKey` | (required) | from <https://app.mnemohq.com/settings/api-keys> |
 | `workspaceId` | (required) | from the dashboard URL |
 | `actorId` | none | optional default actor scope |
-| `baseUrl` | `https://api.proofly.dev` | override for self-hosted |
+| `baseUrl` | `https://api.mnemohq.com` | override for self-hosted |
 | `timeoutMs` | `30000` | per-request abort timeout |
 | `fetch` | global `fetch` | inject for testing or proxying |
 
