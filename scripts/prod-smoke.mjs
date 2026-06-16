@@ -72,8 +72,12 @@ async function main() {
   // Unique per-run nonce so concurrent / re-run smokes never collide and so a
   // leaked memory from a prior run can't masquerade as this run's data.
   const nonce = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-  const containerA = `${base}-a-${nonce}`
-  const containerB = `${base}-b-${nonce}`
+  // containerTag must be "<type>:<id>"; default type "user" when base has no colon.
+  const colon = base.indexOf(':')
+  const ctype = colon >= 0 ? base.slice(0, colon) : 'user'
+  const cidBase = colon >= 0 ? base.slice(colon + 1) : base
+  const containerA = `${ctype}:${cidBase}-a-${nonce}`
+  const containerB = `${ctype}:${cidBase}-b-${nonce}`
   const alphaContent = `${nonce} codeword ALPHA`
   const bravoContent = `${nonce} codeword BRAVO`
 
