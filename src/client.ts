@@ -13,22 +13,25 @@
  *   workspaceId: process.env.GETMNEMO_WORKSPACE_ID!,
  * })
  *
- * await memory.add({ content: 'User prefers Japanese rice.' })
- * const { hits } = await memory.search({ query: 'what rice does the user like?' })
+ * await memory.add({ content: 'User prefers Japanese rice.', containerTag: 'user:jane' })
+ * const { results } = await memory.search({ q: 'what rice does the user like?', containerTag: 'user:jane' })
  * ```
  */
 
 import { MnemoHTTPError, MnemoTimeoutError } from './errors.js'
 import type {
+  AddResponse,
   ClientConfig,
   Memory,
   PaginatedMemories,
+  Scope,
   SearchResponse,
 } from './types.js'
 
 const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
-const SDK_VERSION = '0.1.0'
+const SDK_VERSION = '0.2.0'
+const DEFAULT_SEARCH_LIMIT = 8
 const USER_AGENT = `getmnemo/${SDK_VERSION}`
 const DEFAULT_MAX_RETRIES = 3
 const RETRY_BASE_DELAY_MS = 200
@@ -87,7 +90,7 @@ export class Mnemo {
   readonly #fetch: typeof fetch
   readonly #timeoutMs: number
   readonly #maxRetries: number
-  readonly #defaultActorId: string | undefined
+  readonly #defaultContainerTag: string | undefined
 
   constructor(cfg: ClientConfig) {
     if (!cfg.apiKey) throw new Error('Mnemo: apiKey is required')
@@ -106,71 +109,146 @@ export class Mnemo {
     } else {
       this.#headers['user-agent'] = USER_AGENT
     }
-    if (cfg.actorId) this.#headers['x-actor-id'] = cfg.actorId
-    this.#defaultActorId = cfg.actorId
+    this.#defaultContainerTag = cfg.defaultContainerTag
     this.#fetch = cfg.fetch ?? fetch
     this.#timeoutMs = cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS
     this.#maxRetries = Math.max(0, cfg.maxRetries ?? DEFAULT_MAX_RETRIES)
   }
 
+  /**
+   * Resolve the container for a call into the request fields the API expects.
+   * A structured `scope` wins over a `containerTag` string; both fall back to
+   * the constructor's `defaultContainerTag`. Throws if none is available.
+   */
+  #resolveContainer(
+    method: 'add' | 'search',
+    input: { containerTag?: string; scope?: Scope },
+  ): { containerTag: string } | { scope: Scope } {
+    if (input.scope) return { scope: input.scope }
+    const tag = input.containerTag ?? this.#defaultContainerTag
+    if (tag) return { containerTag: tag }
+    throw new Error(
+      `Mnemo.${method}: a container is required — pass containerTag (e.g. "user:jane") ` +
+        'or scope ({ type, id }) per call, or set defaultContainerTag on the client.',
+    )
+  }
+
+  /**
+   * Hybrid retrieval. Requires a container — pass `containerTag` (e.g.
+   * `"user:jane"`) or `scope`, or set `defaultContainerTag` on the client.
+   *
+   * Sends `POST /v1/search` with body `{ q, limit, containerTag|scope }`.
+   */
   async search(input: {
-    query: string
+    q: string
+    containerTag?: string
+    scope?: Scope
     limit?: number
-    actorId?: string
+    searchMode?: string
   }): Promise<SearchResponse> {
+    const container = this.#resolveContainer('search', input)
     return this.#request<SearchResponse>('POST', '/v1/search', {
-      query: input.query,
-      limit: input.limit ?? 8,
-      ...(input.actorId !== undefined ? { actorId: input.actorId } : {}),
+      q: input.q,
+      limit: input.limit ?? DEFAULT_SEARCH_LIMIT,
+      ...(input.searchMode !== undefined ? { searchMode: input.searchMode } : {}),
+      ...container,
     })
   }
 
+  /**
+   * Store an atomic fact. Requires a container — pass `containerTag` (e.g.
+   * `"user:jane"`) or `scope`, or set `defaultContainerTag` on the client.
+   *
+   * Sends `POST /v1/memories` with body
+   * `{ items: [{ content, metadata? }], containerTag|scope }`.
+   */
   async add(input: {
     content: string
+    containerTag?: string
+    scope?: Scope
     metadata?: Record<string, unknown>
-    actorId?: string
-  }): Promise<Memory> {
-    return this.#request<Memory>('POST', '/v1/memories', {
-      content: input.content,
-      ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
-      ...(input.actorId !== undefined ? { actorId: input.actorId } : {}),
+  }): Promise<AddResponse> {
+    const container = this.#resolveContainer('add', input)
+    return this.#request<AddResponse>('POST', '/v1/memories', {
+      items: [
+        {
+          content: input.content,
+          ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+        },
+      ],
+      ...container,
     })
   }
 
+  /**
+   * Patch an existing memory by id.
+   * Sends `PATCH /v1/memories/{memoryId}` with body `UpdateMemoryDto`
+   * `{ content?, memoryType?, metadata?, source? }` (none required).
+   */
   async update(
-    id: string,
-    input: { content?: string; metadata?: Record<string, unknown> },
+    memoryId: string,
+    input: {
+      content?: string
+      memoryType?: string
+      metadata?: Record<string, unknown>
+      source?: string
+    },
   ): Promise<Memory> {
-    if (input.content === undefined && input.metadata === undefined) {
-      throw new Error('Mnemo.update: at least one of content/metadata must be provided')
+    if (
+      input.content === undefined &&
+      input.memoryType === undefined &&
+      input.metadata === undefined &&
+      input.source === undefined
+    ) {
+      throw new Error(
+        'Mnemo.update: at least one of content/memoryType/metadata/source must be provided',
+      )
     }
-    return this.#request<Memory>('PATCH', `/v1/memories/${encodeURIComponent(id)}`, input)
+    return this.#request<Memory>(
+      'PATCH',
+      `/v1/memories/${encodeURIComponent(memoryId)}`,
+      input,
+    )
   }
 
-  async get(id: string): Promise<Memory> {
-    return this.#request<Memory>('GET', `/v1/memories/${encodeURIComponent(id)}`)
+  /** Fetch a single memory by id. Sends `GET /v1/memories/{memoryId}`. */
+  async get(memoryId: string): Promise<Memory> {
+    return this.#request<Memory>('GET', `/v1/memories/${encodeURIComponent(memoryId)}`)
   }
 
-  async delete(id: string): Promise<void> {
-    await this.#request<unknown>('DELETE', `/v1/memories/${encodeURIComponent(id)}`)
+  /** Remove a memory by id. Sends `DELETE /v1/memories/{memoryId}`. */
+  async delete(memoryId: string): Promise<void> {
+    await this.#request<unknown>(
+      'DELETE',
+      `/v1/memories/${encodeURIComponent(memoryId)}`,
+    )
   }
 
+  /**
+   * Cursor-paginated list of memories, optionally filtered by container.
+   * Sends `GET /v1/memories` with query
+   * `limit?, cursor?, scopeType?, scopeId?, containerTag?`.
+   */
   async list(input?: {
+    containerTag?: string
     limit?: number
     cursor?: string
-    actorId?: string
+    scopeType?: string
+    scopeId?: string
   }): Promise<PaginatedMemories> {
     const params = new URLSearchParams()
     if (input?.limit !== undefined) params.set('limit', String(input.limit))
     if (input?.cursor !== undefined) params.set('cursor', input.cursor)
-    if (input?.actorId !== undefined) params.set('actorId', input.actorId)
+    if (input?.scopeType !== undefined) params.set('scopeType', input.scopeType)
+    if (input?.scopeId !== undefined) params.set('scopeId', input.scopeId)
+    if (input?.containerTag !== undefined) params.set('containerTag', input.containerTag)
     const qs = params.toString()
     return this.#request<PaginatedMemories>('GET', `/v1/memories${qs ? `?${qs}` : ''}`)
   }
 
   /** Echoed back for debugging — never sent to the wire. */
-  get defaultActorId(): string | undefined {
-    return this.#defaultActorId
+  get defaultContainerTag(): string | undefined {
+    return this.#defaultContainerTag
   }
 
   async #request<T>(method: string, path: string, body?: unknown): Promise<T> {

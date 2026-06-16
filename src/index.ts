@@ -5,10 +5,13 @@ export {
   MnemoTimeoutError,
 } from './errors.js'
 export type {
+  AddedItem,
+  AddResponse,
   ClientConfig,
+  Container,
   Memory,
   PaginatedMemories,
+  Scope,
   SearchHit,
   SearchResponse,
-  SearchSource,
 } from './types.js'
