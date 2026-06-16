@@ -6,7 +6,7 @@ Official TypeScript / JavaScript SDK for [Mnemo Memory](https://mnemohq.com) —
 npm install getmnemo
 ```
 
-Zero runtime dependencies. Works in Node 18+, Bun, Deno, browsers, Cloudflare Workers, and any other modern JS runtime with `fetch`.
+Zero runtime dependencies. Works in Node 18+, Bun, Deno, Cloudflare Workers, and any other modern server or edge JS runtime with `fetch`. The `apiKey` is a full-access credential — keep it server-side; for browser or client UIs, proxy through a server route.
 
 ## Quickstart
 

@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { Mnemo } from '@mnemo/memory'
+ * import { Mnemo } from 'getmnemo'
  *
  * const memory = new Mnemo({
  *   apiKey: process.env.GETMNEMO_API_KEY!,
@@ -29,7 +29,7 @@ import type {
 const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
 const SDK_VERSION = '0.1.0'
-const USER_AGENT = `@mnemo/memory/${SDK_VERSION}`
+const USER_AGENT = `getmnemo/${SDK_VERSION}`
 const DEFAULT_MAX_RETRIES = 3
 const RETRY_BASE_DELAY_MS = 200
 const RETRY_MAX_DELAY_MS = 5_000
