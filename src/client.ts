@@ -26,11 +26,12 @@ import type {
   PaginatedMemories,
   Scope,
   SearchResponse,
+  SearchStrategy,
 } from './types.js'
 
 const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
-const SDK_VERSION = '0.2.0'
+const SDK_VERSION = '0.2.2'
 const DEFAULT_SEARCH_LIMIT = 8
 const USER_AGENT = `getmnemo/${SDK_VERSION}`
 const DEFAULT_MAX_RETRIES = 3
@@ -145,12 +146,16 @@ export class Mnemo {
     scope?: Scope
     limit?: number
     searchMode?: string
+    strategies?: SearchStrategy[]
+    excludeIds?: string[]
   }): Promise<SearchResponse> {
     const container = this.#resolveContainer('search', input)
     return this.#request<SearchResponse>('POST', '/v1/search', {
       q: input.q,
       limit: input.limit ?? DEFAULT_SEARCH_LIMIT,
       ...(input.searchMode !== undefined ? { searchMode: input.searchMode } : {}),
+      ...(input.strategies !== undefined ? { strategies: input.strategies } : {}),
+      ...(input.excludeIds !== undefined ? { excludeIds: input.excludeIds } : {}),
       ...container,
     })
   }

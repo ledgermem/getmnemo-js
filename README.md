@@ -65,7 +65,7 @@ hitting the network.
 
 | Method | Purpose |
 |---|---|
-| `search({ q, containerTag?, scope?, limit?, searchMode? })` | Hybrid retrieval. Returns `SearchResponse`. |
+| `search({ q, containerTag?, scope?, limit?, searchMode?, strategies?, excludeIds? })` | Hybrid retrieval. Returns `SearchResponse`. |
 | `add({ content, memoryType?, containerTag?, scope?, metadata? })` | Store an atomic fact. Returns `AddResponse`. |
 | `update(memoryId, { content?, memoryType?, metadata?, source? })` | Patch an existing memory. |
 | `get(memoryId)` | Fetch a single memory. |
@@ -74,6 +74,31 @@ hitting the network.
 
 > Response types (`SearchResponse`, `AddResponse`, `Memory`, …) are **provisional** —
 > reconstructed from observed live payloads pending a fully-annotated API spec.
+
+## Search strategies
+
+`search()` accepts two agent-facing retrieval controls:
+
+| Option | Values | Use when |
+|---|---|---|
+| `strategies` | `temporal`, `graph`, `rerank`, `agentic` | The caller knows the query needs a specific retrieval strategy. Strategies are additive: baseline retrieval still runs. |
+| `excludeIds` | `string[]` | The caller already has some memory/document/fact ids in context and wants fresh results instead of duplicates. |
+
+```ts
+const res = await memory.search({
+  q: 'what changed after the dentist appointment?',
+  containerTag: 'user:jane',
+  strategies: ['temporal', 'graph'],
+  excludeIds: ['mem_123'],
+})
+
+console.log(res.strategiesRan)
+```
+
+Strategy trade-offs: `temporal` is usually cheap, `graph` may add moderate
+latency, while `rerank` and `agentic` can add seconds and extra model cost. The
+SDK deliberately keeps backend mode flags internal; use `strategies` when you
+want to steer retrieval.
 
 ## Memory types
 

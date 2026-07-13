@@ -18,6 +18,12 @@ export type Scope = {
   id: string
 }
 
+/**
+ * Optional retrieval strategies an agent can force-enable for one search.
+ * These are additive: the backend still runs its baseline retrieval.
+ */
+export type SearchStrategy = 'temporal' | 'graph' | 'rerank' | 'agentic'
+
 // ---------------------------------------------------------------------------
 // Response types — confirmed against prod 2026-06-16
 // ---------------------------------------------------------------------------
@@ -107,6 +113,7 @@ export type SearchResponse = {
   searchMode: string
   queryIntent: string
   queryIntentConfidence: number
+  strategiesRan?: string[]
   abstained: boolean
   reranked: boolean
   rawBestVectorSim: number
