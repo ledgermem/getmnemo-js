@@ -101,6 +101,42 @@ describe('Mnemo', () => {
       await client.search({ q: 'rice', scope: { type: 'user', id: 'jane' } })
     })
 
+    it('passes agent-selected strategies and excludeIds through to /v1/search', async () => {
+      const client = new Mnemo({
+        apiKey: 'test',
+        workspaceId: 'ws_test',
+        fetch: fakeFetch(async (req) => {
+          const body = (await req.json()) as Record<string, unknown>
+          expect(body).toEqual({
+            q: 'dentist timeline',
+            limit: 8,
+            containerTag: 'user:jane',
+            strategies: ['temporal', 'graph'],
+            excludeIds: ['mem_1', 'doc_2'],
+          })
+          return json({
+            results: [],
+            strategiesRan: ['vector', 'lexical', 'fact', 'temporal', 'graph'],
+          })
+        }),
+      })
+
+      const res = await client.search({
+        q: 'dentist timeline',
+        containerTag: 'user:jane',
+        strategies: ['temporal', 'graph'],
+        excludeIds: ['mem_1', 'doc_2'],
+      })
+
+      expect(res.strategiesRan).toEqual([
+        'vector',
+        'lexical',
+        'fact',
+        'temporal',
+        'graph',
+      ])
+    })
+
     it('falls back to defaultContainerTag', async () => {
       const client = new Mnemo({
         apiKey: 'test',
