@@ -160,10 +160,11 @@ export class Mnemo {
    * `"user:jane"`) or `scope`, or set `defaultContainerTag` on the client.
    *
    * Sends `POST /v1/memories` with body
-   * `{ items: [{ content, metadata? }], containerTag|scope }`.
+   * `{ items: [{ content, memoryType?, metadata? }], containerTag|scope }`.
    */
   async add(input: {
     content: string
+    memoryType?: string
     containerTag?: string
     scope?: Scope
     metadata?: Record<string, unknown>
@@ -173,6 +174,7 @@ export class Mnemo {
       items: [
         {
           content: input.content,
+          ...(input.memoryType !== undefined ? { memoryType: input.memoryType } : {}),
           ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
         },
       ],

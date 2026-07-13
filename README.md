@@ -24,6 +24,7 @@ const memory = new Mnemo({
 await memory.add({
   content: 'User prefers Japanese short-grain rice for onigiri.',
   containerTag: 'user:jane',
+  memoryType: 'preference',
 })
 
 // Retrieve relevant facts from the same container
@@ -65,7 +66,7 @@ hitting the network.
 | Method | Purpose |
 |---|---|
 | `search({ q, containerTag?, scope?, limit?, searchMode? })` | Hybrid retrieval. Returns `SearchResponse`. |
-| `add({ content, containerTag?, scope?, metadata? })` | Store an atomic fact. Returns `AddResponse`. |
+| `add({ content, memoryType?, containerTag?, scope?, metadata? })` | Store an atomic fact. Returns `AddResponse`. |
 | `update(memoryId, { content?, memoryType?, metadata?, source? })` | Patch an existing memory. |
 | `get(memoryId)` | Fetch a single memory. |
 | `delete(memoryId)` | Remove a memory. |
@@ -73,6 +74,23 @@ hitting the network.
 
 > Response types (`SearchResponse`, `AddResponse`, `Memory`, …) are **provisional** —
 > reconstructed from observed live payloads pending a fully-annotated API spec.
+
+## Memory types
+
+`add()` accepts an optional `memoryType` for callers that want to classify a
+memory at write time:
+
+```ts
+await memory.add({
+  content: 'User avoids shellfish.',
+  memoryType: 'preference',
+  containerTag: 'user:jane',
+})
+```
+
+Known backend types are `memory`, `preference`, `fact`, `observation`, `event`,
+`note`, `reminder`, and `goal`. If an unknown value is sent, the API stores the
+item as `memory` instead of rejecting the whole write batch.
 
 ## Errors
 

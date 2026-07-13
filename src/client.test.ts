@@ -126,7 +126,7 @@ describe('Mnemo', () => {
   })
 
   describe('add', () => {
-    it('wraps content into items[] with containerTag', async () => {
+    it('wraps content into items[] with containerTag and memoryType', async () => {
       const client = new Mnemo({
         apiKey: 'test',
         workspaceId: 'ws_test',
@@ -135,7 +135,13 @@ describe('Mnemo', () => {
           expect(new URL(req.url).pathname).toBe('/v1/memories')
           const body = (await req.json()) as Record<string, unknown>
           expect(body).toEqual({
-            items: [{ content: 'User prefers rice.', metadata: { source: 'test' } }],
+            items: [
+              {
+                content: 'User prefers rice.',
+                memoryType: 'preference',
+                metadata: { source: 'test' },
+              },
+            ],
             containerTag: 'user:jane',
           })
           return json({
@@ -159,6 +165,7 @@ describe('Mnemo', () => {
       })
       const res = await client.add({
         content: 'User prefers rice.',
+        memoryType: 'preference',
         containerTag: 'user:jane',
         metadata: { source: 'test' },
       })
