@@ -1,93 +1,108 @@
 # getmnemo
 
-Official TypeScript / JavaScript SDK for [Mnemo Memory](https://mnemohq.com) — long-term memory infrastructure for AI agents.
+Store and retrieve long-term memory for AI agents with TypeScript or JavaScript.
+
+- [Documentation](https://mnemohq.com/docs)
+- [API keys](https://app.mnemohq.com/settings/api-keys)
+- [API reference](https://mnemohq.com/openapi.json)
+
+## Install
 
 ```bash
 npm install getmnemo
 ```
 
-Zero runtime dependencies. Works in Node 18+, Bun, Deno, Cloudflare Workers, and any other modern server or edge JS runtime with `fetch`.
-
-A default `apiKey` is **full-access** — keep it server-side. Scoped keys **do** exist: the key-mint dialog lets you grant `read` / `write` / `delete` / `billing` scopes individually. For browser or client-exposed contexts, mint a **scoped read-only key** (or proxy through a server route) rather than shipping a full-access key.
+Requires Node.js 18 or later. The package has no runtime dependencies and
+supports both ESM and CommonJS.
 
 ## Quickstart
+
+Create a client, add a memory, and search the same container:
 
 ```ts
 import { Mnemo } from 'getmnemo'
 
-const memory = new Mnemo({
-  apiKey: process.env.GETMNEMO_API_KEY!,
-  workspaceId: process.env.GETMNEMO_WORKSPACE_ID!,
+const mnemo = new Mnemo({
+  apiKey: process.env.MNEMO_API_KEY!,
+  workspaceId: process.env.MNEMO_WORKSPACE_ID!,
 })
 
-// Store an atomic fact, scoped to a container (e.g. a user)
-await memory.add({
-  content: 'User prefers Japanese short-grain rice for onigiri.',
+await mnemo.add({
   containerTag: 'user:jane',
+  content: 'Jane prefers Japanese short-grain rice for onigiri.',
   memoryType: 'preference',
 })
 
-// Retrieve relevant facts from the same container
-const { results } = await memory.search({
-  q: 'what kind of rice does the user like?',
+const { results } = await mnemo.search({
   containerTag: 'user:jane',
+  q: 'What kind of rice does Jane prefer?',
 })
-for (const hit of results) {
-  console.log(hit.score.toFixed(2), hit.content)
-}
+
+console.log(results)
 ```
+
+Keep the API key on your server. Do not expose a full-access key in browser
+code.
 
 ## Containers
 
-Memories live in **containers**. Identify a container two ways:
+A container keeps one user, customer, project, or agent separate from the
+others.
 
-- `containerTag` — a string like `"user:jane"` (the simplest, recommended form)
-- `scope` — the structured equivalent `{ type: 'user', id: 'jane' }`
-
-Memory addition, search, document ingestion, and profiles require a container.
-Set one per call, or set `defaultContainerTag` on the client once:
+Use a readable `containerTag`:
 
 ```ts
-const memory = new Mnemo({
-  apiKey: process.env.GETMNEMO_API_KEY!,
-  workspaceId: process.env.GETMNEMO_WORKSPACE_ID!,
+await mnemo.add({
+  containerTag: 'customer:acme',
+  content: 'Acme renewed through December.',
+})
+```
+
+Or use the equivalent structured scope:
+
+```ts
+await mnemo.add({
+  scope: { type: 'customer', id: 'acme' },
+  content: 'Acme renewed through December.',
+})
+```
+
+Set a default when most calls use the same container:
+
+```ts
+const mnemo = new Mnemo({
+  apiKey: process.env.MNEMO_API_KEY!,
+  workspaceId: process.env.MNEMO_WORKSPACE_ID!,
   defaultContainerTag: 'user:jane',
 })
 
-await memory.add({ content: 'Likes onigiri.' }) // uses user:jane
-await memory.search({ q: 'food preferences?' })  // uses user:jane
+await mnemo.add({ content: 'Jane likes onigiri.' })
+await mnemo.search({ q: 'What food does Jane like?' })
 ```
 
-If neither a per-call container nor a default is set, the SDK throws before
-hitting the network.
+The SDK stops the request if a required container is missing.
 
-## API surface
+## Add memories
 
-| Method | Purpose |
-|---|---|
-| `search({ q, containerTag?, scope?, limit?, searchMode?, filters?, includeSources?, strategies?, excludeIds? })` | Search memories, documents, or both. |
-| `add({ content, id?, idempotencyKey?, source?, ... })` | Store one atomic memory. |
-| `addMany({ items, containerTag?, scope?, metadata?, source? })` | Store up to 100 atomic memories in one request. |
-| `update(memoryId, { content?, memoryType?, metadata?, source? })` | Patch an existing memory. |
-| `get(memoryId)` | Fetch a single memory. |
-| `delete(memoryId, { permanent? })` | Delete a memory and return its recovery receipt. |
-| `restore(memoryId)` | Restore a memory during its recovery window. |
-| `list({ containerTag?, limit?, cursor?, scopeType?, scopeId? })` | Cursor-paginated list. |
-| `profile({ containerTag?, scope?, includeSearch?, q?, ... })` | Build prompt-ready context for one scope. |
-| `documents.create(...)` / `createBatch(...)` | Start asynchronous document ingestion. |
-| `documents.get(...)` / `list(...)` / `update(...)` / `delete(...)` | Manage source documents. |
-| `jobs.get(...)` / `list(...)` / `wait(...)` | Inspect or await ingestion jobs. |
-
-All request and response types are exported by the package.
-
-## Reliable imports
-
-Use `addMany()` for explicit facts and `documents.createBatch()` for raw source
-material. Client IDs, idempotency keys, and provenance make retried imports
-deterministic:
+### Add one memory
 
 ```ts
-await memory.addMany({
+const response = await mnemo.add({
+  containerTag: 'user:jane',
+  content: 'Jane avoids shellfish.',
+  memoryType: 'preference',
+  metadata: { source: 'onboarding' },
+})
+
+console.log(response.items[0].id)
+```
+
+### Add many memories
+
+`addMany()` accepts up to 100 memories:
+
+```ts
+const response = await mnemo.addMany({
   scope: { type: 'customer', id: 'acme' },
   source: { provider: 'hubspot', importId: 'run_42' },
   items: [
@@ -96,175 +111,259 @@ await memory.addMany({
       idempotencyKey: 'hubspot:deal:123:v9',
       metadata: { objectType: 'deal' },
     },
-  ],
-})
-```
-
-Raw documents are processed asynchronously:
-
-```ts
-const batch = await memory.documents.createBatch({
-  documents: [
     {
-      content: meetingTranscript,
-      contentType: 'conversation',
-      customId: 'meeting-2026-07-27',
-      scope: { type: 'customer', id: 'acme' },
+      content: 'The account owner is Priya.',
+      idempotencyKey: 'hubspot:company:456:owner:v3',
     },
   ],
 })
 
-const accepted = batch.results.find((item) => item.status === 'accepted')
-if (accepted) {
-  const job = await memory.jobs.wait(accepted.jobId)
-  console.log(job.status)
+console.log(response.stats)
+```
+
+Use a stable `idempotencyKey` when an import may be retried. Repeating the same
+write will not create another copy.
+
+## Search memories
+
+```ts
+const { results } = await mnemo.search({
+  containerTag: 'user:jane',
+  q: 'What changed after the dentist appointment?',
+  limit: 10,
+  includeSources: true,
+})
+
+for (const result of results) {
+  console.log(result.score, result.content, result.source)
 }
 ```
 
-Document batches contain at most 50 documents. Each result is isolated as
-`accepted` or `failed`; one malformed record does not hide the outcome of the
-others.
+Use the following options only when your application needs more control:
 
-## Recoverable deletion
+| Option | Values | Purpose |
+| --- | --- | --- |
+| `searchMode` | `hybrid`, `memories`, `documents` | Select the content to search. |
+| `filters` | `Record<string, unknown>` | Restrict results by metadata. |
+| `includeSources` | `boolean` | Return provenance with each result. |
+| `strategies` | `temporal`, `graph`, `rerank`, `agentic` | Add a retrieval strategy to the normal search. |
+| `excludeIds` | `string[]` | Leave out results already in the agent's context. |
 
-Deletion is recoverable by default when recovery is enabled for the workspace:
+For example:
 
 ```ts
-const deleted = await memory.delete(memoryId)
-console.log(deleted.receipt?.restorableUntil)
+const result = await mnemo.search({
+  containerTag: 'user:jane',
+  q: 'What changed after the dentist appointment?',
+  strategies: ['temporal'],
+  excludeIds: ['mem_123'],
+})
 
-await memory.restore(memoryId)
+console.log(result.strategiesRan)
 ```
 
-Use `delete(memoryId, { permanent: true })` only when immediate permanent
-deletion is intentional.
+`temporal` usually adds little latency. `graph` may add moderate latency.
+`rerank` and `agentic` may add model cost and take longer.
 
-## Profiles
+## Ingest documents
 
-`profile()` assembles static facts, dynamic context, preferences, and hard
-constraints for one scope. It does not run search unless explicitly requested:
+Use documents for conversations, notes, transcripts, and other raw text. Mnemo
+processes documents asynchronously.
+
+### Ingest one document
 
 ```ts
-const context = await memory.profile({
+const accepted = await mnemo.documents.create({
+  containerTag: 'customer:acme',
+  content: meetingTranscript,
+  contentType: 'conversation',
+  customId: 'meeting-2026-07-27',
+})
+
+const job = await mnemo.jobs.wait(accepted.jobId)
+console.log(job.status)
+```
+
+### Ingest a batch
+
+`createBatch()` accepts up to 50 documents. Every result is reported separately,
+so one invalid document does not hide the others.
+
+```ts
+const batch = await mnemo.documents.createBatch({
+  documents: [
+    {
+      scope: { type: 'customer', id: 'acme' },
+      content: meetingTranscript,
+      contentType: 'conversation',
+      customId: 'meeting-2026-07-27',
+    },
+    {
+      scope: { type: 'customer', id: 'acme' },
+      content: accountNotes,
+      contentType: 'note',
+      customId: 'account-notes-2026-07-27',
+    },
+  ],
+})
+
+for (const item of batch.results) {
+  if (item.status === 'accepted') {
+    await mnemo.jobs.wait(item.jobId)
+  } else {
+    console.error(`Document ${item.index} failed: ${item.error}`)
+  }
+}
+```
+
+## Read and update memories
+
+```ts
+const memory = await mnemo.get('mem_123')
+
+await mnemo.update(memory.id, {
+  content: 'Jane now prefers brown rice.',
+  metadata: { changedBy: 'user' },
+})
+
+const page = await mnemo.list({
+  containerTag: 'user:jane',
+  limit: 20,
+})
+
+console.log(page.items, page.nextCursor)
+```
+
+## Delete and restore memories
+
+Deletion is recoverable when recovery is enabled for the workspace:
+
+```ts
+const deleted = await mnemo.delete('mem_123')
+
+console.log(deleted.receipt?.restorableUntil)
+
+await mnemo.restore('mem_123')
+```
+
+Skip the recovery window only when permanent deletion is intentional:
+
+```ts
+await mnemo.delete('mem_123', { permanent: true })
+```
+
+## Build prompt context
+
+`profile()` returns prompt-ready facts, recent context, preferences, and hard
+constraints for one container:
+
+```ts
+const context = await mnemo.profile({
   containerTag: 'user:jane',
   staticLimit: 12,
   dynamicLimit: 10,
 })
+```
 
-const contextWithSearch = await memory.profile({
+Search is off by default. To include search results, provide both
+`includeSearch` and `q`:
+
+```ts
+const context = await mnemo.profile({
   containerTag: 'user:jane',
   includeSearch: true,
   q: 'What should I know before replying?',
 })
 ```
 
-## Search strategies
-
-`search()` accepts two agent-facing retrieval controls:
-
-| Option | Values | Use when |
-|---|---|---|
-| `searchMode` | `hybrid`, `memories`, `documents` | Choose which public content lanes can return results. |
-| `filters` | `Record<string, unknown>` | Restrict results using public metadata filters. |
-| `includeSources` | `boolean` | Include provenance when the application needs receipts. |
-| `strategies` | `temporal`, `graph`, `rerank`, `agentic` | The caller knows the query needs a specific retrieval strategy. Strategies are additive: baseline retrieval still runs. |
-| `excludeIds` | `string[]` | The caller already has some memory/document/fact ids in context and wants fresh results instead of duplicates. |
-
-```ts
-const res = await memory.search({
-  q: 'what changed after the dentist appointment?',
-  containerTag: 'user:jane',
-  strategies: ['temporal', 'graph'],
-  excludeIds: ['mem_123'],
-})
-
-console.log(res.strategiesRan)
-```
-
-Strategy trade-offs: `temporal` is usually cheap, `graph` may add moderate
-latency, while `rerank` and `agentic` can add seconds and extra model cost. The
-SDK deliberately keeps backend mode flags internal; use `strategies` when you
-want to steer retrieval.
-
 ## Memory types
 
-`add()` accepts an optional `memoryType` for callers that want to classify a
-memory at write time:
+`memoryType` is optional. Supported values include:
+
+- `memory`
+- `preference`
+- `fact`
+- `observation`
+- `event`
+- `note`
+- `reminder`
+- `goal`
+
+The API stores an unknown value as `memory` instead of rejecting the write.
+
+## Error handling
+
+The SDK throws:
+
+- `MnemoHTTPError` for an unsuccessful API response.
+- `MnemoTimeoutError` when a request reaches its timeout.
+- `MnemoError` as the base class for SDK errors.
 
 ```ts
-await memory.add({
-  content: 'User avoids shellfish.',
-  memoryType: 'preference',
-  containerTag: 'user:jane',
-})
-```
-
-Known backend types are `memory`, `preference`, `fact`, `observation`, `event`,
-`note`, `reminder`, and `goal`. If an unknown value is sent, the API stores the
-item as `memory` instead of rejecting the whole write batch.
-
-## Errors
-
-All HTTP failures throw `MnemoHTTPError` with `.status` and `.body`. Aborted requests throw `MnemoTimeoutError`. Both inherit from `MnemoError`.
-
-```ts
-import { Mnemo, MnemoHTTPError } from 'getmnemo'
+import { MnemoHTTPError } from 'getmnemo'
 
 try {
-  await memory.search({ q: 'rice', containerTag: 'user:jane' })
-} catch (err) {
-  if (err instanceof MnemoHTTPError && err.status === 401) {
-    console.error('API key rejected:', err.body)
+  await mnemo.search({
+    containerTag: 'user:jane',
+    q: 'rice preference',
+  })
+} catch (error) {
+  if (error instanceof MnemoHTTPError) {
+    console.error(error.status, error.body)
   } else {
-    throw err
+    throw error
   }
 }
 ```
 
-## Configuration
+The client retries transient network errors, `429` responses, and `5xx`
+responses. Set `maxRetries: 0` to disable retries.
 
-| Option | Default | Notes |
-|---|---|---|
-| `apiKey` | (required) | from <https://app.mnemohq.com/settings/api-keys> |
-| `workspaceId` | (required) | sent as the `x-workspace-id` header |
-| `defaultContainerTag` | none | fallback for add, search, documents, and profiles |
-| `baseUrl` | `https://api.mnemohq.com` | override for self-hosted |
-| `timeoutMs` | `30000` | per-request abort timeout |
-| `fetch` | global `fetch` | inject for testing or proxying |
-| `maxRetries` | `3` | retries for 429, 5xx, and transient network failures |
+## Client configuration
 
-## Develop
+| Option | Required | Default | Description |
+| --- | --- | --- | --- |
+| `apiKey` | Yes | - | Mnemo API key. |
+| `workspaceId` | Yes | - | Workspace sent in the `x-workspace-id` header. |
+| `defaultContainerTag` | No | - | Container used when a call does not provide one. |
+| `baseUrl` | No | `https://api.mnemohq.com` | API base URL. |
+| `timeoutMs` | No | `30000` | Request timeout in milliseconds. |
+| `maxRetries` | No | `3` | Retries for transient failures. |
+| `fetch` | No | `globalThis.fetch` | Custom fetch implementation for tests or proxies. |
 
-```bash
-npm install
-npm test
-npm run contract
-npm run build
-```
+API keys are full-access by default. You can create a key with only the
+`read`, `write`, `delete`, or `billing` scopes it needs. Use a read-only scoped
+key or a server proxy when a key may reach client code.
 
-## CI smoke gate
+## Method reference
 
-The publish workflow (`.github/workflows/publish.yml`) will **not** publish to
-npm unless a real production round-trip passes first. A `smoke` job runs on the
-same `v*` tag trigger and the `publish` job depends on it via `needs: smoke`, so
-a failed smoke blocks the release.
+| Method | What it does |
+| --- | --- |
+| `add(input)` | Add one memory. |
+| `addMany(input)` | Add up to 100 memories. |
+| `search(input)` | Search memories, documents, or both. |
+| `get(memoryId)` | Get one memory. |
+| `list(input)` | List memories with cursor pagination. |
+| `update(memoryId, input)` | Update one memory. |
+| `delete(memoryId, options?)` | Delete one memory. |
+| `restore(memoryId)` | Restore a recoverable deletion. |
+| `profile(input)` | Build context for a prompt. |
+| `documents.create(input)` | Start one document ingestion job. |
+| `documents.createBatch(input)` | Start up to 50 document ingestion jobs. |
+| `documents.get(documentId)` | Get one document. |
+| `documents.list(input)` | List documents. |
+| `documents.update(documentId, input)` | Update and optionally reprocess a document. |
+| `documents.delete(documentId)` | Delete a document. |
+| `jobs.get(jobId, options?)` | Get one ingestion job. |
+| `jobs.list()` | List ingestion jobs. |
+| `jobs.wait(jobId, options?)` | Wait for an ingestion job to finish. |
 
-`npm run smoke` (`scripts/prod-smoke.mjs`) writes a memory to container **A** and
-another to container **B** against prod, confirms the add/search round-trip via
-`response.results`, then asserts **tenant isolation**: a search scoped to B must
-not return A's memory, and vice versa. A leak exits non-zero with a loud
-`TENANT ISOLATION FAILURE` — treat that as a production security finding, not a
-flaky test. Created memories are deleted on cleanup (cleanup failure only warns).
+All request and response types are exported from `getmnemo`.
 
-It needs three secrets, which **must be ORG-level (no repo-level twin)** — a
-repo-level twin shadows the org secret, which is exactly the failure mode that
-broke an earlier publish:
+## Help
 
-| Secret | Purpose |
-|---|---|
-| `MNEMO_API_KEY` | Scoped test key. **Needs `delete` scope** so the smoke can clean up the memories it creates (plus `write` + `search`). |
-| `MNEMO_WORKSPACE_ID` | Throwaway test workspace id. |
-| `MNEMO_TEST_CONTAINER` | Base `containerTag` (e.g. `ci-smoke`); the script derives unique per-run A/B containers from it. |
+- Read the [Mnemo documentation](https://mnemohq.com/docs).
+- Report SDK problems in [GitHub Issues](https://github.com/ledgermem/getmnemo-js/issues).
 
 ## License
 
