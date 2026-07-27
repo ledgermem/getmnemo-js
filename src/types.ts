@@ -1,59 +1,42 @@
 /**
  * Public types for the Mnemo SDK.
  *
- * Request types are derived from the OpenAPI spec at
- * `https://api.mnemohq.com/openapi.json` ("Mnemo API" v0.2.0).
- *
- * Response types are confirmed against real prod payloads captured 2026-06-16
- * (the spec does NOT annotate response schemas — every memories/search op
- * returns `{}` — so these shapes were finalized from live responses).
+ * Request types track the public OpenAPI contract at
+ * `https://mnemohq.com/openapi.json`. Response types are maintained from the
+ * corresponding API service return values until response schemas are emitted.
  */
 
-/**
- * Structured container scope. The alternative to the `containerTag` string —
- * e.g. `{ type: 'user', id: 'jane' }` is equivalent to `containerTag: 'user:jane'`.
- */
 export type Scope = {
   type: string
   id: string
+  tags?: string[]
 }
 
-/**
- * Optional retrieval strategies an agent can force-enable for one search.
- * These are additive: the backend still runs its baseline retrieval.
- */
+export type Source = Record<string, unknown>
+export type SearchMode = 'hybrid' | 'memories' | 'documents'
 export type SearchStrategy = 'temporal' | 'graph' | 'rerank' | 'agentic'
+export type SearchFilters = Record<string, unknown>
+export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed'
+export type DocumentStatus = JobStatus
 
-// ---------------------------------------------------------------------------
-// Response types — confirmed against prod 2026-06-16
-// ---------------------------------------------------------------------------
-
-/** The container a memory belongs to. */
-// confirmed against prod 2026-06-16
 export type Container = {
   id: string
   tag: string
   containerType: string
-  displayName: string
+  displayName: string | null
 }
 
-/**
- * A single memory as returned by `get`/`update`, and the per-item shape inside
- * `list` and `add` responses.
- */
-// confirmed against prod 2026-06-16
 export type Memory = {
   id: string
   scope: Scope
   scopeKey: string
   container: Container
   content: string
-  contentHash: string
+  contentHash: string | null
   idempotencyKey: string | null
   memoryType: string
   metadata: Record<string, unknown> | null
-  // `source` shape is still loosely typed — UNCONFIRMED against a real payload.
-  source: unknown | null
+  source: Source | null
   sourceDocumentId: string | null
   eventId: string | null
   deletedAt: string | null
@@ -61,22 +44,88 @@ export type Memory = {
   updatedAt: string
 }
 
-/**
- * One stored item in an `add` response. Same fields as a `Memory`.
- */
-// confirmed against prod 2026-06-16
+export type MemoryItemInput = {
+  id?: string
+  content: string
+  idempotencyKey?: string
+  memoryType?: string
+  metadata?: Record<string, unknown>
+  source?: Source
+}
+
+export type AddMemoryInput = MemoryItemInput & {
+  containerTag?: string
+  scope?: Scope
+}
+
+export type AddManyInput = {
+  items: MemoryItemInput[]
+  containerTag?: string
+  scope?: Scope
+  containerType?: string
+  metadata?: Record<string, unknown>
+  source?: Source
+}
+
 export type AddedItem = Memory
 
-/** Response shape of `add()`. */
-// confirmed against prod 2026-06-16
 export type AddResponse = {
   scopeKey: string
   scope: Scope
   items: AddedItem[]
+  stats?: {
+    total: number
+    created: number
+    deduplicated: number
+  }
 }
 
-/** One retrieval hit in a `search` response. */
-// confirmed against prod 2026-06-16
+export type UpdateMemoryInput = {
+  content?: string
+  memoryType?: string
+  metadata?: Record<string, unknown> | null
+  source?: Source | null
+}
+
+export type DeleteMemoryOptions = {
+  permanent?: boolean
+}
+
+export type DeleteMemoryReceipt = {
+  id: string
+  eventId: string
+  status: 'restorable' | 'completed'
+  completedAt: string
+  purged: Record<string, number>
+  recoveryId?: string
+  restorableUntil?: string
+}
+
+export type DeleteMemoryResponse = {
+  id: string
+  deleted: true
+  receipt?: DeleteMemoryReceipt
+}
+
+export type RestoreMemoryResponse = {
+  id: string
+  restored: true
+  receiptId: string
+  restoredAt: string
+}
+
+export type SearchInput = {
+  q: string
+  containerTag?: string
+  scope?: Scope
+  limit?: number
+  searchMode?: SearchMode
+  filters?: SearchFilters
+  includeSources?: boolean
+  strategies?: SearchStrategy[]
+  excludeIds?: string[]
+}
+
 export type SearchHit = {
   resultType: string
   memoryId: string
@@ -88,10 +137,9 @@ export type SearchHit = {
   score: number
   createdAt: string
   updatedAt: string
+  source?: Source | null
 }
 
-/** Per-stage timing breakdown returned by `search`. */
-// confirmed against prod 2026-06-16
 export type SearchLatency = {
   parallelMs: number
   strategyMs: number
@@ -100,17 +148,11 @@ export type SearchLatency = {
   totalMs: number
 }
 
-/**
- * Response shape of `search()`. The primary results live in `results`; the
- * `positivePreferences` and `hardConstraints` arrays carry the same `SearchHit`
- * shape, alongside retrieval metadata.
- */
-// confirmed against prod 2026-06-16
 export type SearchResponse = {
   results: SearchHit[]
   positivePreferences: SearchHit[]
   hardConstraints: SearchHit[]
-  searchMode: string
+  searchMode: SearchMode
   queryIntent: string
   queryIntentConfidence: number
   strategiesRan?: string[]
@@ -120,37 +162,239 @@ export type SearchResponse = {
   latency: SearchLatency
 }
 
-/** Cursor-paginated list of memories. */
-// confirmed against prod 2026-06-16
+export type ListMemoriesInput = {
+  containerTag?: string
+  limit?: number
+  cursor?: string
+  scopeType?: string
+  scopeId?: string
+}
+
 export type PaginatedMemories = {
   items: Memory[]
   nextCursor: string | null
+  total?: number
 }
 
-// ---------------------------------------------------------------------------
-// Client config
-// ---------------------------------------------------------------------------
+export type Job = {
+  id: string
+  status: JobStatus
+  documentId: string
+  scopeKey?: string
+  scope?: Scope
+  retryable: boolean
+  attempts: {
+    current: number
+    max: number
+  }
+  error: {
+    code: string | null
+    message: string | null
+  } | null
+  startedAt: string | null
+  finishedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type JobListResponse = {
+  items: Job[]
+}
+
+export type GetJobOptions = {
+  waitSeconds?: number
+}
+
+export type WaitForJobOptions = {
+  timeoutMs?: number
+  pollIntervalMs?: number
+}
+
+export type CreateDocumentInput = {
+  content: string
+  contentType: string
+  customId?: string
+  metadata?: Record<string, unknown>
+  entityContext?: Record<string, unknown>
+  containerType?: string
+  containerTag?: string
+  scope?: Scope
+}
+
+export type Document = {
+  id: string
+  scopeKey: string
+  scope: Scope
+  contentType: string
+  contentPreview: string
+  content: string
+  customId: string | null
+  metadata: Record<string, unknown> | null
+  entityContext: Record<string, unknown> | null
+  status: DocumentStatus
+  processedAt: string | null
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
+  latestJob: Job | null
+}
+
+export type CreateDocumentResponse = {
+  documentId: string
+  jobId: string
+  status: JobStatus
+  reused: boolean
+  document?: Document
+  job?: Job
+}
+
+export type CreateDocumentsBatchInput = {
+  documents: CreateDocumentInput[]
+}
+
+export type DocumentBatchResult =
+  | {
+      index: number
+      customId?: string
+      status: 'accepted'
+      documentId: string
+      jobId: string
+      ingestionStatus: JobStatus
+      reused: boolean
+    }
+  | {
+      index: number
+      customId?: string
+      status: 'failed'
+      error: string
+    }
+
+export type CreateDocumentsBatchResponse = {
+  success: number
+  failed: number
+  results: DocumentBatchResult[]
+}
+
+export type ListDocumentsInput = {
+  containerTag?: string
+  scope?: Scope
+  limit?: number
+  cursor?: string
+  status?: DocumentStatus
+}
+
+export type PaginatedDocuments = {
+  items: Document[]
+  nextCursor: string | null
+}
+
+export type UpdateDocumentInput = {
+  content?: string
+  contentType?: string
+  customId?: string | null
+  metadata?: Record<string, unknown> | null
+  entityContext?: Record<string, unknown> | null
+  reprocess?: boolean
+}
+
+export type UpdateDocumentResponse = {
+  document: Document
+  job: Job | null
+}
+
+export type DeleteDocumentResponse = {
+  id: string
+  deleted: true
+  forgottenMemories: number
+  failedJobs: number
+}
+
+export type ProfileStaticFact = {
+  key: string
+  value: unknown
+  confidence: number | null
+  polarity: string
+}
+
+export type ProfileDynamicItem =
+  | {
+      resultType: 'memory'
+      id: string
+      content: string
+      memoryType: string
+      polarity: string
+      metadata: Record<string, unknown> | null
+      createdAt: string
+      updatedAt: string
+    }
+  | {
+      resultType: 'document'
+      id: string
+      content: string
+      contentType: string
+      metadata: Record<string, unknown> | null
+      createdAt: string
+      updatedAt: string
+    }
+
+export type ProfileInput = {
+  containerTag?: string
+  scope?: Scope
+  q?: string
+  threshold?: number
+  includeSearch?: boolean
+  staticLimit?: number
+  dynamicLimit?: number
+  itemMaxBytes?: number
+}
+
+export type ProfileResponse = {
+  scopeKey: string
+  scope: Scope
+  profile: {
+    static: ProfileStaticFact[]
+    dynamic: ProfileDynamicItem[]
+    positivePreferences: ProfileStaticFact[]
+    hardConstraints: {
+      facts: ProfileStaticFact[]
+      memories: Array<{
+        id: string
+        content: string
+        createdAt: string
+        updatedAt: string
+      }>
+    }
+  }
+  promptGuidance: {
+    hardConstraintsNotice: string
+  }
+  stats: {
+    staticTotal: number
+    dynamicTotal: number
+    truncatedItems: number
+    cached: boolean
+  }
+  searchResults?: SearchHit[]
+  searchPositivePreferences?: SearchHit[]
+  searchHardConstraints?: SearchHit[]
+}
 
 export type ClientConfig = {
   /**
-   * Required. Full-access by default — keep server-side. For client-exposed
-   * contexts, mint a scoped read-only key. Get one at
-   * https://app.mnemohq.com/settings/api-keys.
+   * Required. Full-access by default, so keep it server-side. For exposed
+   * clients, mint a scoped read-only key.
    */
   apiKey: string
-  /** Required. Workspace ID — sent as the `x-workspace-id` header on every call. */
+  /** Workspace ID sent as `x-workspace-id` on every call. */
   workspaceId: string
-  /**
-   * Optional default container tag (e.g. `"user:jane"`). When set, `add` and
-   * `search` fall back to it if no per-call `containerTag`/`scope` is given.
-   */
+  /** Default container tag used by add, search, documents, and profile. */
   defaultContainerTag?: string
   /** Defaults to https://api.mnemohq.com. */
   baseUrl?: string
-  /** Per-request timeout in ms (default 30s). */
+  /** Per-request timeout in milliseconds. Defaults to 30 seconds. */
   timeoutMs?: number
-  /** Inject a custom fetch — handy for testing or proxying. */
+  /** Custom fetch implementation for tests, proxies, or edge runtimes. */
   fetch?: typeof fetch
-  /** Max retry attempts on 429/5xx and transient network errors (default 3). */
+  /** Retry attempts for 429, 5xx, and transient network errors. Defaults to 3. */
   maxRetries?: number
 }

@@ -19,19 +19,29 @@
  */
 
 import { MnemoHTTPError, MnemoTimeoutError } from './errors.js'
+import { DocumentsResource, JobsResource } from './resources.js'
 import type {
+  AddManyInput,
+  AddMemoryInput,
   AddResponse,
   ClientConfig,
+  DeleteMemoryOptions,
+  DeleteMemoryResponse,
+  ListMemoriesInput,
   Memory,
   PaginatedMemories,
+  ProfileInput,
+  ProfileResponse,
+  RestoreMemoryResponse,
   Scope,
+  SearchInput,
   SearchResponse,
-  SearchStrategy,
+  UpdateMemoryInput,
 } from './types.js'
 
 const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
-const SDK_VERSION = '0.2.2'
+const SDK_VERSION = '0.3.0'
 const DEFAULT_SEARCH_LIMIT = 8
 const USER_AGENT = `getmnemo/${SDK_VERSION}`
 const DEFAULT_MAX_RETRIES = 3
@@ -41,11 +51,7 @@ const RETRY_MAX_DELAY_MS = 5_000
 // Browsers reject `user-agent` as a forbidden header — setting it via fetch
 // throws or warns. Detect a browser-like environment so we can skip it there.
 const IS_BROWSER_LIKE =
-  typeof globalThis !== 'undefined' &&
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  typeof (globalThis as any).window !== 'undefined' &&
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  typeof (globalThis as any).document !== 'undefined'
+  typeof window !== 'undefined' && typeof document !== 'undefined'
 
 function retryDelayMs(attempt: number): number {
   const capped = Math.min(RETRY_BASE_DELAY_MS * 2 ** attempt, RETRY_MAX_DELAY_MS)
@@ -92,6 +98,8 @@ export class Mnemo {
   readonly #timeoutMs: number
   readonly #maxRetries: number
   readonly #defaultContainerTag: string | undefined
+  readonly documents: DocumentsResource
+  readonly jobs: JobsResource
 
   constructor(cfg: ClientConfig) {
     if (!cfg.apiKey) throw new Error('Mnemo: apiKey is required')
@@ -114,6 +122,16 @@ export class Mnemo {
     this.#fetch = cfg.fetch ?? fetch
     this.#timeoutMs = cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS
     this.#maxRetries = Math.max(0, cfg.maxRetries ?? DEFAULT_MAX_RETRIES)
+
+    const request = <T>(method: string, path: string, body?: unknown): Promise<T> =>
+      this.#request<T>(method, path, body)
+    const resolveContainer = (
+      method: string,
+      input: { containerTag?: string; scope?: Scope },
+    ): { containerTag: string } | { scope: Scope } =>
+      this.#resolveContainer(method, input)
+    this.documents = new DocumentsResource(request, resolveContainer)
+    this.jobs = new JobsResource(request)
   }
 
   /**
@@ -122,7 +140,7 @@ export class Mnemo {
    * the constructor's `defaultContainerTag`. Throws if none is available.
    */
   #resolveContainer(
-    method: 'add' | 'search',
+    method: string,
     input: { containerTag?: string; scope?: Scope },
   ): { containerTag: string } | { scope: Scope } {
     if (input.scope) return { scope: input.scope }
@@ -140,20 +158,16 @@ export class Mnemo {
    *
    * Sends `POST /v1/search` with body `{ q, limit, containerTag|scope }`.
    */
-  async search(input: {
-    q: string
-    containerTag?: string
-    scope?: Scope
-    limit?: number
-    searchMode?: string
-    strategies?: SearchStrategy[]
-    excludeIds?: string[]
-  }): Promise<SearchResponse> {
+  async search(input: SearchInput): Promise<SearchResponse> {
     const container = this.#resolveContainer('search', input)
     return this.#request<SearchResponse>('POST', '/v1/search', {
       q: input.q,
       limit: input.limit ?? DEFAULT_SEARCH_LIMIT,
       ...(input.searchMode !== undefined ? { searchMode: input.searchMode } : {}),
+      ...(input.filters !== undefined ? { filters: input.filters } : {}),
+      ...(input.includeSources !== undefined
+        ? { includeSources: input.includeSources }
+        : {}),
       ...(input.strategies !== undefined ? { strategies: input.strategies } : {}),
       ...(input.excludeIds !== undefined ? { excludeIds: input.excludeIds } : {}),
       ...container,
@@ -167,22 +181,40 @@ export class Mnemo {
    * Sends `POST /v1/memories` with body
    * `{ items: [{ content, memoryType?, metadata? }], containerTag|scope }`.
    */
-  async add(input: {
-    content: string
-    memoryType?: string
-    containerTag?: string
-    scope?: Scope
-    metadata?: Record<string, unknown>
-  }): Promise<AddResponse> {
-    const container = this.#resolveContainer('add', input)
+  async add(input: AddMemoryInput): Promise<AddResponse> {
+    const {
+      containerTag,
+      scope,
+      id,
+      content,
+      idempotencyKey,
+      memoryType,
+      metadata,
+      source,
+    } = input
+    return this.addMany({
+      containerTag,
+      scope,
+      items: [{ id, content, idempotencyKey, memoryType, metadata, source }],
+    })
+  }
+
+  /**
+   * Store between 1 and 100 atomic memories in one synchronous request.
+   * Per-item IDs and idempotency keys make imports safe to retry.
+   */
+  async addMany(input: AddManyInput): Promise<AddResponse> {
+    if (input.items.length < 1 || input.items.length > 100) {
+      throw new Error('Mnemo.addMany: batch size must be between 1 and 100')
+    }
+    const container = this.#resolveContainer('addMany', input)
     return this.#request<AddResponse>('POST', '/v1/memories', {
-      items: [
-        {
-          content: input.content,
-          ...(input.memoryType !== undefined ? { memoryType: input.memoryType } : {}),
-          ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
-        },
-      ],
+      items: input.items,
+      ...(input.containerType !== undefined
+        ? { containerType: input.containerType }
+        : {}),
+      ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+      ...(input.source !== undefined ? { source: input.source } : {}),
       ...container,
     })
   }
@@ -194,12 +226,7 @@ export class Mnemo {
    */
   async update(
     memoryId: string,
-    input: {
-      content?: string
-      memoryType?: string
-      metadata?: Record<string, unknown>
-      source?: string
-    },
+    input: UpdateMemoryInput,
   ): Promise<Memory> {
     if (
       input.content === undefined &&
@@ -223,11 +250,26 @@ export class Mnemo {
     return this.#request<Memory>('GET', `/v1/memories/${encodeURIComponent(memoryId)}`)
   }
 
-  /** Remove a memory by id. Sends `DELETE /v1/memories/{memoryId}`. */
-  async delete(memoryId: string): Promise<void> {
-    await this.#request<unknown>(
+  /**
+   * Delete a memory. Deletion is recoverable by default when the workspace has
+   * the recovery window enabled. Pass `permanent: true` only for an immediate purge.
+   */
+  async delete(
+    memoryId: string,
+    options: DeleteMemoryOptions = {},
+  ): Promise<DeleteMemoryResponse> {
+    const query = options.permanent === true ? '?permanent=true' : ''
+    return this.#request<DeleteMemoryResponse>(
       'DELETE',
-      `/v1/memories/${encodeURIComponent(memoryId)}`,
+      `/v1/memories/${encodeURIComponent(memoryId)}${query}`,
+    )
+  }
+
+  /** Restore a memory during its recoverable deletion window. */
+  async restore(memoryId: string): Promise<RestoreMemoryResponse> {
+    return this.#request<RestoreMemoryResponse>(
+      'POST',
+      `/v1/memories/${encodeURIComponent(memoryId)}/restore`,
     )
   }
 
@@ -236,13 +278,7 @@ export class Mnemo {
    * Sends `GET /v1/memories` with query
    * `limit?, cursor?, scopeType?, scopeId?, containerTag?`.
    */
-  async list(input?: {
-    containerTag?: string
-    limit?: number
-    cursor?: string
-    scopeType?: string
-    scopeId?: string
-  }): Promise<PaginatedMemories> {
+  async list(input?: ListMemoriesInput): Promise<PaginatedMemories> {
     const params = new URLSearchParams()
     if (input?.limit !== undefined) params.set('limit', String(input.limit))
     if (input?.cursor !== undefined) params.set('cursor', input.cursor)
@@ -251,6 +287,22 @@ export class Mnemo {
     if (input?.containerTag !== undefined) params.set('containerTag', input.containerTag)
     const qs = params.toString()
     return this.#request<PaginatedMemories>('GET', `/v1/memories${qs ? `?${qs}` : ''}`)
+  }
+
+  /**
+   * Return a prompt-ready profile for one scope. Search augmentation is
+   * deliberately opt-in because it adds retrieval latency and compute.
+   */
+  async profile(input: ProfileInput = {}): Promise<ProfileResponse> {
+    if (input.includeSearch === true && !input.q?.trim()) {
+      throw new Error('Mnemo.profile: q is required when includeSearch is true')
+    }
+    const container = this.#resolveContainer('profile', input)
+    const { containerTag: _containerTag, scope: _scope, ...profile } = input
+    return this.#request<ProfileResponse>('POST', '/v1/profile', {
+      ...container,
+      ...profile,
+    })
   }
 
   /** Echoed back for debugging — never sent to the wire. */

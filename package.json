@@ -1,6 +1,6 @@
 {
   "name": "getmnemo",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Official TypeScript / JavaScript SDK for Mnemo Memory — long-term memory infrastructure for AI agents.",
   "type": "module",
   "license": "MIT",
@@ -29,6 +29,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "contract": "node scripts/contract-check.mjs",
+    "prepack": "npm run typecheck && npm test && npm run build",
     "smoke": "node scripts/prod-smoke.mjs"
   },
   "keywords": [
