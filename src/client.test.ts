@@ -226,6 +226,18 @@ describe('Mnemo', () => {
                 contentHash: 'h1',
               },
             ],
+            receipt: {
+              writeId: '11111111-1111-4111-8111-111111111111',
+              status: 'searchable',
+              searchableAt: '2026-07-28T09:14:22.442Z',
+              items: [
+                {
+                  inputIndex: 0,
+                  memoryId: 'mem_123',
+                  status: 'created',
+                },
+              ],
+            },
           })
         }),
       })
@@ -237,6 +249,18 @@ describe('Mnemo', () => {
       })
       expect(res.scopeKey).toBe('user:jane')
       expect(res.items[0]?.id).toBe('mem_123')
+      expect(res.receipt).toEqual({
+        writeId: '11111111-1111-4111-8111-111111111111',
+        status: 'searchable',
+        searchableAt: '2026-07-28T09:14:22.442Z',
+        items: [
+          {
+            inputIndex: 0,
+            memoryId: 'mem_123',
+            status: 'created',
+          },
+        ],
+      })
     })
 
     it('throws when no container is available', async () => {
@@ -300,6 +324,15 @@ describe('Mnemo', () => {
             scope: { type: 'customer', id: 'acme' },
             items: [],
             stats: { total: 2, created: 2, deduplicated: 0 },
+            receipt: {
+              writeId: '22222222-2222-4222-8222-222222222222',
+              status: 'searchable',
+              searchableAt: '2026-07-28T09:15:00.000Z',
+              items: [
+                { inputIndex: 0, memoryId: 'mem_1', status: 'created' },
+                { inputIndex: 1, memoryId: 'mem_2', status: 'created' },
+              ],
+            },
           })
         }),
       })
@@ -314,6 +347,8 @@ describe('Mnemo', () => {
       })
 
       expect(result.stats).toEqual({ total: 2, created: 2, deduplicated: 0 })
+      expect(result.receipt.status).toBe('searchable')
+      expect(result.receipt.items).toHaveLength(2)
     })
 
     it('rejects empty and oversized batches before sending', async () => {

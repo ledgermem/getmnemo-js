@@ -95,6 +95,7 @@ const response = await mnemo.add({
 })
 
 console.log(response.items[0].id)
+console.log(response.receipt.status) // "searchable"
 ```
 
 ### Add many memories
@@ -119,10 +120,32 @@ const response = await mnemo.addMany({
 })
 
 console.log(response.stats)
+console.log(response.receipt.items)
 ```
 
 Use a stable `idempotencyKey` when an import may be retried. Repeating the same
 write will not create another copy.
+
+Every successful `add()` and `addMany()` response includes a receipt:
+
+```ts
+{
+  writeId: 'e5bf3f0f-16e2-4a5d-9c7f-98e437cf86c4',
+  status: 'searchable',
+  searchableAt: '2026-07-28T09:14:22.442Z',
+  items: [
+    {
+      inputIndex: 0,
+      memoryId: '8a8a4f8c-cf91-43e4-9a0e-7c2bb2c4d3f2',
+      status: 'created',
+    },
+  ],
+}
+```
+
+Receipt items follow input order. A `deduplicated` item reused an equivalent
+memory already present in the same container. Both outcomes are searchable
+when the API returns.
 
 ## Search memories
 
