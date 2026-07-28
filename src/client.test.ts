@@ -498,6 +498,62 @@ describe('Mnemo', () => {
     })
   })
 
+  describe('protected memories', () => {
+    it('sends privileged policy when adding a protected memory', async () => {
+      const client = new Mnemo({
+        apiKey: 'test',
+        workspaceId: 'ws_test',
+        defaultContainerTag: 'user:jane',
+        fetch: fakeFetch(async (req) => {
+          expect(req.method).toBe('POST')
+          expect(new URL(req.url).pathname).toBe('/v1/memories')
+          expect(await req.json()).toMatchObject({
+            items: [
+              {
+                content: 'Never disclose the recovery phrase.',
+                mutationPolicy: 'privileged',
+              },
+            ],
+          })
+          return json({ scopeKey: 'user:jane', scope: { type: 'user', id: 'jane' }, items: [] })
+        }),
+      })
+
+      await client.add({
+        content: 'Never disclose the recovery phrase.',
+        mutationPolicy: 'privileged',
+      })
+    })
+
+    it('protects and unprotects through the policy endpoint', async () => {
+      const policies: string[] = []
+      const client = new Mnemo({
+        apiKey: 'test',
+        workspaceId: 'ws_test',
+        fetch: fakeFetch(async (req) => {
+          expect(req.method).toBe('PATCH')
+          expect(new URL(req.url).pathname).toBe(
+            '/v1/memories/mem_1/protection',
+          )
+          const body = (await req.json()) as { mutationPolicy: string }
+          policies.push(body.mutationPolicy)
+          return json({
+            id: 'mem_1',
+            mutationPolicy: body.mutationPolicy,
+            protectedAt:
+              body.mutationPolicy === 'privileged'
+                ? '2026-07-28T00:00:00.000Z'
+                : null,
+          })
+        }),
+      })
+
+      await client.protect('mem_1')
+      await client.unprotect('mem_1')
+      expect(policies).toEqual(['privileged', 'standard'])
+    })
+  })
+
   describe('documents', () => {
     it('creates a document with the default container', async () => {
       const client = new Mnemo({

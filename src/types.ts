@@ -18,6 +18,7 @@ export type SearchStrategy = 'temporal' | 'graph' | 'rerank' | 'agentic'
 export type SearchFilters = Record<string, unknown>
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type DocumentStatus = JobStatus
+export type MemoryMutationPolicy = 'standard' | 'privileged'
 
 export type Container = {
   id: string
@@ -35,6 +36,8 @@ export type Memory = {
   contentHash: string | null
   idempotencyKey: string | null
   memoryType: string
+  mutationPolicy: MemoryMutationPolicy
+  protectedAt: string | null
   metadata: Record<string, unknown> | null
   source: Source | null
   sourceDocumentId: string | null
@@ -49,6 +52,7 @@ export type MemoryItemInput = {
   content: string
   idempotencyKey?: string
   memoryType?: string
+  mutationPolicy?: MemoryMutationPolicy
   metadata?: Record<string, unknown>
   source?: Source
 }
@@ -99,6 +103,10 @@ export type UpdateMemoryInput = {
   memoryType?: string
   metadata?: Record<string, unknown> | null
   source?: Source | null
+}
+
+export type UpdateMemoryProtectionInput = {
+  mutationPolicy: MemoryMutationPolicy
 }
 
 export type DeleteMemoryOptions = {

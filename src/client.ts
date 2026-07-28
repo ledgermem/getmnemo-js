@@ -29,6 +29,7 @@ import type {
   DeleteMemoryResponse,
   ListMemoriesInput,
   Memory,
+  MemoryMutationPolicy,
   PaginatedMemories,
   ProfileInput,
   ProfileResponse,
@@ -41,7 +42,7 @@ import type {
 
 const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
-const SDK_VERSION = '0.3.2'
+const SDK_VERSION = '0.4.0'
 const DEFAULT_SEARCH_LIMIT = 8
 const USER_AGENT = `getmnemo/${SDK_VERSION}`
 const DEFAULT_MAX_RETRIES = 3
@@ -189,13 +190,24 @@ export class Mnemo {
       content,
       idempotencyKey,
       memoryType,
+      mutationPolicy,
       metadata,
       source,
     } = input
     return this.addMany({
       containerTag,
       scope,
-      items: [{ id, content, idempotencyKey, memoryType, metadata, source }],
+      items: [
+        {
+          id,
+          content,
+          idempotencyKey,
+          memoryType,
+          mutationPolicy,
+          metadata,
+          source,
+        },
+      ],
     })
   }
 
@@ -248,6 +260,31 @@ export class Mnemo {
   /** Fetch a single memory by id. Sends `GET /v1/memories/{memoryId}`. */
   async get(memoryId: string): Promise<Memory> {
     return this.#request<Memory>('GET', `/v1/memories/${encodeURIComponent(memoryId)}`)
+  }
+
+  /**
+   * Change the mutation policy for a memory. Privileged policy changes require
+   * a server-issued API key with the `memories:protect` scope.
+   */
+  async setProtection(
+    memoryId: string,
+    mutationPolicy: MemoryMutationPolicy,
+  ): Promise<Memory> {
+    return this.#request<Memory>(
+      'PATCH',
+      `/v1/memories/${encodeURIComponent(memoryId)}/protection`,
+      { mutationPolicy },
+    )
+  }
+
+  /** Require a privileged credential for future mutations of this memory. */
+  async protect(memoryId: string): Promise<Memory> {
+    return this.setProtection(memoryId, 'privileged')
+  }
+
+  /** Return a protected memory to the standard mutation policy. */
+  async unprotect(memoryId: string): Promise<Memory> {
+    return this.setProtection(memoryId, 'standard')
   }
 
   /**

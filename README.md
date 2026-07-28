@@ -275,6 +275,26 @@ Skip the recovery window only when permanent deletion is intentional:
 await mnemo.delete('mem_123', { permanent: true })
 ```
 
+## Protect important memories
+
+Protected memories require explicitly privileged API-key scopes before they can
+be changed or deleted:
+
+```ts
+const result = await mnemo.add({
+  containerTag: 'user:jane',
+  content: 'Never disclose the account recovery phrase.',
+  mutationPolicy: 'privileged',
+})
+
+await mnemo.protect(result.items[0].id)
+await mnemo.unprotect(result.items[0].id)
+```
+
+Use a server-side key with `memories:protect` to create or change protection.
+Updating, deleting, and restoring protected memories also requires the matching
+`memories:protected:update` or `memories:protected:delete` scope.
+
 ## Build prompt context
 
 `profile()` returns prompt-ready facts, recent context, preferences, and hard
@@ -370,6 +390,9 @@ key or a server proxy when a key may reach client code.
 | `update(memoryId, input)` | Update one memory. |
 | `delete(memoryId, options?)` | Delete one memory. |
 | `restore(memoryId)` | Restore a recoverable deletion. |
+| `protect(memoryId)` | Require privileged mutation scopes for a memory. |
+| `unprotect(memoryId)` | Return a memory to the standard mutation policy. |
+| `setProtection(memoryId, policy)` | Set the mutation policy explicitly. |
 | `profile(input)` | Build context for a prompt. |
 | `documents.create(input)` | Start one document ingestion job. |
 | `documents.createBatch(input)` | Start up to 50 document ingestion jobs. |
