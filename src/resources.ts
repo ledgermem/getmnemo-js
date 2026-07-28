@@ -78,11 +78,12 @@ export class DocumentsResource {
     const params = new URLSearchParams()
     if (input.limit !== undefined) params.set('limit', String(input.limit))
     if (input.cursor !== undefined) params.set('cursor', input.cursor)
-    if (input.scope !== undefined) {
-      params.set('scopeType', input.scope.type)
-      params.set('scopeId', input.scope.id)
-    } else if (input.containerTag !== undefined) {
-      params.set('containerTag', input.containerTag)
+    const container = this.resolveContainer('documents.list', input)
+    if ('scope' in container) {
+      params.set('scopeType', container.scope.type)
+      params.set('scopeId', container.scope.id)
+    } else {
+      params.set('containerTag', container.containerTag)
     }
     if (input.status !== undefined) params.set('status', input.status)
     const query = params.toString()

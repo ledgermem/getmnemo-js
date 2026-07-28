@@ -793,6 +793,30 @@ describe('Mnemo', () => {
       const res = await client.list({ containerTag: 'user:jane', limit: 10 })
       expect(res.items).toEqual([])
     })
+
+    it('uses the client default container and rejects an unscoped call without one', async () => {
+      const withDefault = new Mnemo({
+        apiKey: 'test',
+        workspaceId: 'ws_test',
+        defaultContainerTag: 'user:default',
+        fetch: fakeFetch((req) => {
+          expect(new URL(req.url).searchParams.get('containerTag')).toBe(
+            'user:default',
+          )
+          return json({ items: [], nextCursor: null })
+        }),
+      })
+      await withDefault.list()
+
+      const withoutDefault = new Mnemo({
+        apiKey: 'test',
+        workspaceId: 'ws_test',
+        fetch: fakeFetch(() => json({ items: [], nextCursor: null })),
+      })
+      await expect(withoutDefault.list()).rejects.toThrow(
+        /a container is required/,
+      )
+    })
   })
 
   describe('errors', () => {

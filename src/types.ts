@@ -186,9 +186,12 @@ export type SearchResponse = {
 
 export type ListMemoriesInput = {
   containerTag?: string
+  scope?: Scope
   limit?: number
   cursor?: string
+  /** @deprecated Use scope instead. */
   scopeType?: string
+  /** @deprecated Use scope instead. */
   scopeId?: string
 }
 

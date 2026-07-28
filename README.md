@@ -386,7 +386,7 @@ key or a server proxy when a key may reach client code.
 | `addMany(input)` | Add up to 100 memories. |
 | `search(input)` | Search memories, documents, or both. |
 | `get(memoryId)` | Get one memory. |
-| `list(input)` | List memories with cursor pagination. |
+| `list(input)` | List memories in one explicit or default scope. |
 | `update(memoryId, input)` | Update one memory. |
 | `delete(memoryId, options?)` | Delete one memory. |
 | `restore(memoryId)` | Restore a recoverable deletion. |
@@ -397,7 +397,7 @@ key or a server proxy when a key may reach client code.
 | `documents.create(input)` | Start one document ingestion job. |
 | `documents.createBatch(input)` | Start up to 50 document ingestion jobs. |
 | `documents.get(documentId)` | Get one document. |
-| `documents.list(input)` | List documents. |
+| `documents.list(input)` | List documents in one explicit or default scope. |
 | `documents.update(documentId, input)` | Update and optionally reprocess a document. |
 | `documents.delete(documentId)` | Delete a document. |
 | `jobs.get(jobId, options?)` | Get one ingestion job. |

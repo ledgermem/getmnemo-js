@@ -311,17 +311,31 @@ export class Mnemo {
   }
 
   /**
-   * Cursor-paginated list of memories, optionally filtered by container.
+   * Cursor-paginated list of memories within one required container.
    * Sends `GET /v1/memories` with query
-   * `limit?, cursor?, scopeType?, scopeId?, containerTag?`.
+   * `limit?, cursor?, scopeType+scopeId|containerTag`.
    */
-  async list(input?: ListMemoriesInput): Promise<PaginatedMemories> {
+  async list(input: ListMemoriesInput = {}): Promise<PaginatedMemories> {
     const params = new URLSearchParams()
-    if (input?.limit !== undefined) params.set('limit', String(input.limit))
-    if (input?.cursor !== undefined) params.set('cursor', input.cursor)
-    if (input?.scopeType !== undefined) params.set('scopeType', input.scopeType)
-    if (input?.scopeId !== undefined) params.set('scopeId', input.scopeId)
-    if (input?.containerTag !== undefined) params.set('containerTag', input.containerTag)
+    if (input.limit !== undefined) params.set('limit', String(input.limit))
+    if (input.cursor !== undefined) params.set('cursor', input.cursor)
+    if (input.scopeType !== undefined || input.scopeId !== undefined) {
+      if (!input.scopeType || !input.scopeId) {
+        throw new Error(
+          'Mnemo.list: legacy scopeType and scopeId must be supplied together',
+        )
+      }
+      params.set('scopeType', input.scopeType)
+      params.set('scopeId', input.scopeId)
+    } else {
+      const container = this.#resolveContainer('list', input)
+      if ('scope' in container) {
+        params.set('scopeType', container.scope.type)
+        params.set('scopeId', container.scope.id)
+      } else {
+        params.set('containerTag', container.containerTag)
+      }
+    }
     const qs = params.toString()
     return this.#request<PaginatedMemories>('GET', `/v1/memories${qs ? `?${qs}` : ''}`)
   }
