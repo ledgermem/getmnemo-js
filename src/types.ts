@@ -69,6 +69,19 @@ export type AddManyInput = {
 
 export type AddedItem = Memory
 
+export type MemoryWriteReceiptItem = {
+  inputIndex: number
+  memoryId: string
+  status: 'created' | 'deduplicated'
+}
+
+export type MemoryWriteReceipt = {
+  writeId: string
+  status: 'searchable'
+  searchableAt: string
+  items: MemoryWriteReceiptItem[]
+}
+
 export type AddResponse = {
   scopeKey: string
   scope: Scope
@@ -78,6 +91,7 @@ export type AddResponse = {
     created: number
     deduplicated: number
   }
+  receipt: MemoryWriteReceipt
 }
 
 export type UpdateMemoryInput = {

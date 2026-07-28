@@ -41,7 +41,7 @@ import type {
 
 const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
-const SDK_VERSION = '0.3.1'
+const SDK_VERSION = '0.3.2'
 const DEFAULT_SEARCH_LIMIT = 8
 const USER_AGENT = `getmnemo/${SDK_VERSION}`
 const DEFAULT_MAX_RETRIES = 3
