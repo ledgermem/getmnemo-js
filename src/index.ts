@@ -23,6 +23,7 @@ export type {
   Document,
   DocumentBatchResult,
   DocumentStatus,
+  EnrichmentMode,
   GetJobOptions,
   Job,
   JobListResponse,
@@ -50,4 +51,5 @@ export type {
   UpdateDocumentResponse,
   UpdateMemoryInput,
   WaitForJobOptions,
+  WorkspaceExport,
 } from './types.js'

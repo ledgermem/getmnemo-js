@@ -19,6 +19,7 @@ export type SearchFilters = Record<string, unknown>
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type DocumentStatus = JobStatus
 export type MemoryMutationPolicy = 'standard' | 'privileged'
+export type EnrichmentMode = 'sync' | 'deferred' | 'skip'
 
 export type Container = {
   id: string
@@ -60,6 +61,7 @@ export type MemoryItemInput = {
 export type AddMemoryInput = MemoryItemInput & {
   containerTag?: string
   scope?: Scope
+  enrichmentMode?: EnrichmentMode
 }
 
 export type AddManyInput = {
@@ -69,6 +71,8 @@ export type AddManyInput = {
   containerType?: string
   metadata?: Record<string, unknown>
   source?: Source
+  /** Keep submitted content verbatim and skip derived LLM enrichment. */
+  enrichmentMode?: EnrichmentMode
 }
 
 export type AddedItem = Memory
@@ -313,6 +317,16 @@ export type PaginatedDocuments = {
   nextCursor: string | null
 }
 
+export type WorkspaceExport = {
+  id: string
+  kind: 'workspace_export'
+  status: JobStatus
+  downloadUrl?: string | null
+  expiresAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export type UpdateDocumentInput = {
   content?: string
   contentType?: string
@@ -410,8 +424,8 @@ export type ClientConfig = {
    * clients, mint a scoped read-only key.
    */
   apiKey: string
-  /** Workspace ID sent as `x-workspace-id` on every call. */
-  workspaceId: string
+  /** @deprecated Workspace identity is now taken from the API key. */
+  workspaceId?: string
   /** Default container tag used by add, search, documents, and profile. */
   defaultContainerTag?: string
   /** Defaults to https://api.mnemohq.com. */

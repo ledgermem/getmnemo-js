@@ -18,7 +18,7 @@ function json(body: unknown, status = 200): Response {
 
 describe('Mnemo', () => {
   describe('auth headers', () => {
-    it('sends Bearer apiKey + x-workspace-id on every call', async () => {
+    it('sends the API key without a caller-selected workspace header', async () => {
       let seen: Headers | undefined
       const client = new Mnemo({
         apiKey: 'prfly_live_abc',
@@ -31,7 +31,7 @@ describe('Mnemo', () => {
       })
       await client.search({ q: 'x' })
       expect(seen?.get('authorization')).toBe('Bearer prfly_live_abc')
-      expect(seen?.get('x-workspace-id')).toBe('ws_test')
+      expect(seen?.get('x-workspace-id')).toBeNull()
     })
   })
 
@@ -304,6 +304,24 @@ describe('Mnemo', () => {
   })
 
   describe('addMany', () => {
+    it('supports verbatim governed imports without sending a workspace selector', async () => {
+      const client = new Mnemo({
+        apiKey: 'test',
+        workspaceId: 'legacy-value',
+        fetch: fakeFetch(async (req) => {
+          expect(req.headers.get('x-workspace-id')).toBeNull()
+          expect(await req.json()).toMatchObject({ enrichmentMode: 'skip' })
+          return json({ scopeKey: 'customer:acme', items: [] })
+        }),
+      })
+
+      await client.addMany({
+        scope: { type: 'customer', id: 'acme' },
+        enrichmentMode: 'skip',
+        items: [{ content: 'Source of truth.' }],
+      })
+    })
+
     it('sends up to 100 memory items in one request', async () => {
       const client = new Mnemo({
         apiKey: 'test',
@@ -372,6 +390,26 @@ describe('Mnemo', () => {
         }),
       ).rejects.toThrow(/between 1 and 100/)
       expect(calls).toBe(0)
+    })
+  })
+
+  describe('workspace exports', () => {
+    it('uses the tenant-bound export endpoints', async () => {
+      const paths: string[] = []
+      const client = new Mnemo({
+        apiKey: 'test',
+        fetch: fakeFetch((req) => {
+          paths.push(new URL(req.url).pathname)
+          if (req.method === 'POST') return json({ id: 'export_1', status: 'queued' })
+          if (paths.length === 2) return json({ items: [{ id: 'export_1' }] })
+          return json({ id: 'export_1', status: 'completed' })
+        }),
+      })
+
+      await client.createWorkspaceExport()
+      await client.listWorkspaceExports()
+      await client.getWorkspaceExport('export_1')
+      expect(paths).toEqual(['/v1/exports', '/v1/exports', '/v1/exports/export_1'])
     })
   })
 

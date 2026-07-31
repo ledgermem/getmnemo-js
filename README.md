@@ -24,7 +24,6 @@ import { Mnemo } from 'getmnemo'
 
 const mnemo = new Mnemo({
   apiKey: process.env.MNEMO_API_KEY!,
-  workspaceId: process.env.MNEMO_WORKSPACE_ID!,
 })
 
 await mnemo.add({
@@ -72,7 +71,6 @@ Set a default when most calls use the same container:
 ```ts
 const mnemo = new Mnemo({
   apiKey: process.env.MNEMO_API_KEY!,
-  workspaceId: process.env.MNEMO_WORKSPACE_ID!,
   defaultContainerTag: 'user:jane',
 })
 
@@ -122,6 +120,22 @@ const response = await mnemo.addMany({
 console.log(response.stats)
 console.log(response.receipt.items)
 ```
+
+For a governed import whose source system is authoritative, keep the submitted
+text and metadata unchanged while skipping derived LLM enrichment:
+
+```ts
+await mnemo.addMany({
+  scope: { type: 'customer', id: 'acme' },
+  enrichmentMode: 'skip',
+  items: approvedRecords,
+})
+```
+
+The API key determines the workspace. `workspaceId` remains accepted only as a
+deprecated compatibility option and is no longer sent as a caller-selected
+header. For audit or rebuild workflows, use `createWorkspaceExport()`, then
+poll `getWorkspaceExport()` until its download URL is available.
 
 Use a stable `idempotencyKey` when an import may be retried. Repeating the same
 write will not create another copy.
@@ -366,8 +380,8 @@ responses. Set `maxRetries: 0` to disable retries.
 
 | Option | Required | Default | Description |
 | --- | --- | --- | --- |
-| `apiKey` | Yes | - | Mnemo API key. |
-| `workspaceId` | Yes | - | Workspace sent in the `x-workspace-id` header. |
+| `apiKey` | Yes | - | Mnemo API key. The key is bound to one workspace. |
+| `workspaceId` | No | - | Deprecated compatibility option; not sent to the API. |
 | `defaultContainerTag` | No | - | Container used when a call does not provide one. |
 | `baseUrl` | No | `https://api.mnemohq.com` | API base URL. |
 | `timeoutMs` | No | `30000` | Request timeout in milliseconds. |
@@ -384,6 +398,9 @@ key or a server proxy when a key may reach client code.
 | --- | --- |
 | `add(input)` | Add one memory. |
 | `addMany(input)` | Add up to 100 memories. |
+| `createWorkspaceExport()` | Start a tenant-bound workspace export. |
+| `listWorkspaceExports()` | List export jobs for the current API-key workspace. |
+| `getWorkspaceExport(exportId)` | Read one export job and its download URL. |
 | `search(input)` | Search memories, documents, or both. |
 | `get(memoryId)` | Get one memory. |
 | `list(input)` | List memories in one explicit or default scope. |

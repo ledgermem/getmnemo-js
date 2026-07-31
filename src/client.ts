@@ -38,11 +38,12 @@ import type {
   SearchInput,
   SearchResponse,
   UpdateMemoryInput,
+  WorkspaceExport,
 } from './types.js'
 
 const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
-const SDK_VERSION = '0.4.0'
+const SDK_VERSION = '0.4.2'
 const DEFAULT_SEARCH_LIMIT = 8
 const USER_AGENT = `getmnemo/${SDK_VERSION}`
 const DEFAULT_MAX_RETRIES = 3
@@ -104,11 +105,9 @@ export class Mnemo {
 
   constructor(cfg: ClientConfig) {
     if (!cfg.apiKey) throw new Error('Mnemo: apiKey is required')
-    if (!cfg.workspaceId) throw new Error('Mnemo: workspaceId is required')
     this.#baseUrl = (cfg.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '')
     this.#headers = {
       authorization: `Bearer ${cfg.apiKey}`,
-      'x-workspace-id': cfg.workspaceId,
       'content-type': 'application/json',
     }
     // `user-agent` is on the forbidden header list in browsers — setting it
@@ -193,10 +192,12 @@ export class Mnemo {
       mutationPolicy,
       metadata,
       source,
+      enrichmentMode,
     } = input
     return this.addMany({
       containerTag,
       scope,
+      enrichmentMode,
       items: [
         {
           id,
@@ -227,8 +228,33 @@ export class Mnemo {
         : {}),
       ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
       ...(input.source !== undefined ? { source: input.source } : {}),
+      ...(input.enrichmentMode !== undefined
+        ? { enrichmentMode: input.enrichmentMode }
+        : {}),
       ...container,
     })
+  }
+
+  /** Start a tenant-bound export for audit, drift checking, or rebuilds. */
+  async createWorkspaceExport(): Promise<WorkspaceExport> {
+    return this.#request<WorkspaceExport>('POST', '/v1/exports')
+  }
+
+  /** List export jobs for the API-key workspace. */
+  async listWorkspaceExports(): Promise<WorkspaceExport[]> {
+    const response = await this.#request<{ items: WorkspaceExport[] }>(
+      'GET',
+      '/v1/exports',
+    )
+    return response.items
+  }
+
+  /** Read one tenant-bound export job. */
+  async getWorkspaceExport(exportId: string): Promise<WorkspaceExport> {
+    return this.#request<WorkspaceExport>(
+      'GET',
+      `/v1/exports/${encodeURIComponent(exportId)}`,
+    )
   }
 
   /**
