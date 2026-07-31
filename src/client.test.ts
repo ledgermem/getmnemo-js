@@ -333,10 +333,15 @@ describe('Mnemo', () => {
           }
           expect(new URL(req.url).pathname).toBe('/v1/memories')
           expect(body.items).toEqual([
-            { content: 'First fact', idempotencyKey: 'import:1' },
+            {
+              content: 'First fact',
+              idempotencyKey: 'import:1',
+              memoryType: 'fact',
+            },
             { content: 'Second fact', metadata: { row: 2 } },
           ])
           expect(body.source).toEqual({ importId: 'run_1' })
+          expect(body.enrichmentMode).toBe('skip')
           return json({
             scopeKey: 'customer:acme',
             scope: { type: 'customer', id: 'acme' },
@@ -358,8 +363,9 @@ describe('Mnemo', () => {
       const result = await client.addMany({
         scope: { type: 'customer', id: 'acme' },
         source: { importId: 'run_1' },
+        enrichmentMode: 'skip',
         items: [
-          { content: 'First fact', idempotencyKey: 'import:1' },
+          { content: 'First fact', idempotencyKey: 'import:1', memoryType: 'fact' },
           { content: 'Second fact', metadata: { row: 2 } },
         ],
       })
