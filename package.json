@@ -1,6 +1,6 @@
 {
   "name": "getmnemo",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "TypeScript and JavaScript SDK for storing and retrieving long-term memory with Mnemo.",
   "type": "module",
   "license": "MIT",

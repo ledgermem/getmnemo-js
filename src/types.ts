@@ -152,6 +152,26 @@ export type SearchInput = {
   excludeIds?: string[]
 }
 
+export type SearchProvenance = {
+  filePath?: string
+  section?: string
+  commitHash?: string
+  sourceId?: string
+  sourceChunkId?: string
+  sourceChunkText?: string
+  transformation?: string
+}
+
+export type SearchHitSources = {
+  provenance?: SearchProvenance | null
+  vectorSimilarity?: number | null
+  lexicalScore?: number | null
+  temporalBoosted?: boolean
+  kind?: string
+  customId?: string | null
+  contentType?: string
+}
+
 export type SearchHit = {
   resultType: string
   memoryId: string
@@ -164,6 +184,7 @@ export type SearchHit = {
   createdAt: string
   updatedAt: string
   source?: Source | null
+  sources?: SearchHitSources | null
 }
 
 export type SearchLatency = {
