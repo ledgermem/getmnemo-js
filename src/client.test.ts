@@ -58,6 +58,12 @@ describe('Mnemo', () => {
                 score: 0.91,
                 createdAt: '2026-06-16T00:00:00.000Z',
                 updatedAt: '2026-06-16T00:00:00.000Z',
+                sources: {
+                  provenance: {
+                    filePath: 'notes/preferences.md',
+                    commitHash: 'abc123',
+                  },
+                },
               },
             ],
             positivePreferences: [],
@@ -82,6 +88,7 @@ describe('Mnemo', () => {
       expect(res.results).toHaveLength(1)
       expect(res.results[0]?.score).toBe(0.91)
       expect(res.results[0]?.scopeKey).toBe('user:jane')
+      expect(res.results[0]?.sources?.provenance?.commitHash).toBe('abc123')
     })
 
     it('sends scope instead of containerTag when scope is given', async () => {

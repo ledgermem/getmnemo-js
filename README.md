@@ -172,7 +172,7 @@ const { results } = await mnemo.search({
 })
 
 for (const result of results) {
-  console.log(result.score, result.content, result.source)
+  console.log(result.score, result.content, result.sources?.provenance)
 }
 ```
 
