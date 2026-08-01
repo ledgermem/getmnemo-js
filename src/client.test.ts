@@ -458,6 +458,22 @@ describe('Mnemo', () => {
       ).rejects.toThrow(/receipt/i)
     })
 
+    it('rejects a receipt whose memory id disagrees with the returned item', async () => {
+      const response = addResponse(['created'])
+      ;(
+        (response.receipt as { items: Array<{ memoryId: string }> }).items[0]!
+      ).memoryId = 'mem_different'
+      const client = new Mnemo({
+        apiKey: 'test',
+        defaultContainerTag: 'user:jane',
+        fetch: fakeFetch(() => json(response)),
+      })
+
+      await expect(
+        client.addMany({ items: [{ content: 'first' }] }),
+      ).rejects.toThrow(/receipt/i)
+    })
+
     it('retries a timed-out atomic batch when every item has an idempotency key', async () => {
       let calls = 0
       const client = new Mnemo({

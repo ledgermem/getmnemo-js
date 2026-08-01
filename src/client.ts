@@ -43,7 +43,7 @@ import type {
 
 const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
-const SDK_VERSION = '0.4.3'
+const SDK_VERSION = '0.4.4'
 const DEFAULT_SEARCH_LIMIT = 8
 const USER_AGENT = `getmnemo/${SDK_VERSION}`
 const DEFAULT_MAX_RETRIES = 3
@@ -500,6 +500,10 @@ function validateAddResponse(value: unknown, inputCount: number): AddResponse {
     seen.add(index)
     if (typeof item.memoryId !== 'string' || item.memoryId.length === 0) {
       throw invalidReceipt(`item ${index} has no memory id`)
+    }
+    const returnedMemory = value.items[index]
+    if (!isRecord(returnedMemory) || returnedMemory.id !== item.memoryId) {
+      throw invalidReceipt(`item ${index} memory id does not match the response`)
     }
     if (item.status === 'created') created += 1
     else if (item.status === 'deduplicated') deduplicated += 1
