@@ -163,8 +163,8 @@ when the API returns.
 
 The SDK validates the complete receipt before resolving `add()` or `addMany()`.
 Missing, duplicated, or contradictory item outcomes fail the call instead of
-being reported as successful. Timed-out memory batches are retried only when
-every item carries a stable `idempotencyKey`.
+being reported as successful. Timed-out or disconnected memory batches are
+retried only when every item carries a stable `idempotencyKey`.
 
 ## Search memories
 

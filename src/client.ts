@@ -233,7 +233,7 @@ export class Mnemo {
         : {}),
       ...container,
     }, {
-      retryTimeout: input.items.every((item) => Boolean(item.idempotencyKey)),
+      retryAmbiguousFailure: input.items.every((item) => Boolean(item.idempotencyKey)),
     })
     return validateAddResponse(response, input.items.length)
   }
@@ -394,7 +394,7 @@ export class Mnemo {
     method: string,
     path: string,
     body?: unknown,
-    options: { retryTimeout?: boolean } = {},
+    options: { retryAmbiguousFailure?: boolean } = {},
   ): Promise<T> {
     const serializedBody = body === undefined ? undefined : JSON.stringify(body)
     let lastErr: unknown
@@ -429,7 +429,7 @@ export class Mnemo {
         return parsed as T
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
-          if (options.retryTimeout && attempt < this.#maxRetries) {
+          if (options.retryAmbiguousFailure && attempt < this.#maxRetries) {
             lastErr = new MnemoTimeoutError(this.#timeoutMs)
             await sleep(retryDelayMs(attempt))
             continue
@@ -438,7 +438,7 @@ export class Mnemo {
         }
         if (err instanceof MnemoHTTPError) throw err
         lastErr = err
-        if (attempt < this.#maxRetries) {
+        if (options.retryAmbiguousFailure !== false && attempt < this.#maxRetries) {
           await sleep(retryDelayMs(attempt))
           continue
         }

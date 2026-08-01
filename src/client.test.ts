@@ -498,6 +498,45 @@ describe('Mnemo', () => {
       ).resolves.toMatchObject({ receipt: { status: 'searchable' } })
       expect(calls).toBe(2)
     })
+
+    it('does not retry an ambiguous transport failure without idempotency keys', async () => {
+      let calls = 0
+      const client = new Mnemo({
+        apiKey: 'test',
+        defaultContainerTag: 'user:jane',
+        maxRetries: 2,
+        fetch: fakeFetch(() => {
+          calls += 1
+          throw new TypeError('connection reset after write')
+        }),
+      })
+
+      await expect(
+        client.addMany({ items: [{ content: 'unsafe retry' }] }),
+      ).rejects.toThrow(/connection reset/i)
+      expect(calls).toBe(1)
+    })
+
+    it('retries an ambiguous transport failure with stable idempotency keys', async () => {
+      let calls = 0
+      const client = new Mnemo({
+        apiKey: 'test',
+        defaultContainerTag: 'user:jane',
+        maxRetries: 1,
+        fetch: fakeFetch(() => {
+          calls += 1
+          if (calls === 1) throw new TypeError('connection reset after write')
+          return json(addResponse(['deduplicated']))
+        }),
+      })
+
+      await expect(
+        client.addMany({
+          items: [{ content: 'safe retry', idempotencyKey: 'import:stable:2' }],
+        }),
+      ).resolves.toMatchObject({ receipt: { status: 'searchable' } })
+      expect(calls).toBe(2)
+    })
   })
 
   describe('workspace exports', () => {
