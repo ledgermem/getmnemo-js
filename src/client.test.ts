@@ -16,6 +16,30 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
+function addResponse(statuses: Array<'created' | 'deduplicated'>): Record<string, unknown> {
+  const created = statuses.filter((status) => status === 'created').length
+  return {
+    scopeKey: 'customer:acme',
+    scope: { type: 'customer', id: 'acme' },
+    items: statuses.map((_, index) => ({ id: `mem_${index + 1}` })),
+    stats: {
+      total: statuses.length,
+      created,
+      deduplicated: statuses.length - created,
+    },
+    receipt: {
+      writeId: '22222222-2222-4222-8222-222222222222',
+      status: 'searchable',
+      searchableAt: '2026-07-28T09:15:00.000Z',
+      items: statuses.map((status, inputIndex) => ({
+        inputIndex,
+        memoryId: `mem_${inputIndex + 1}`,
+        status,
+      })),
+    },
+  }
+}
+
 describe('Mnemo', () => {
   describe('auth headers', () => {
     it('sends the API key without a caller-selected workspace header', async () => {
@@ -403,6 +427,60 @@ describe('Mnemo', () => {
         }),
       ).rejects.toThrow(/between 1 and 100/)
       expect(calls).toBe(0)
+    })
+
+    it('rejects a successful response that omits an input receipt', async () => {
+      const response = addResponse(['created', 'created'])
+      ;(response.receipt as { items: unknown[] }).items.pop()
+      const client = new Mnemo({
+        apiKey: 'test',
+        defaultContainerTag: 'user:jane',
+        fetch: fakeFetch(() => json(response)),
+      })
+
+      await expect(
+        client.addMany({ items: [{ content: 'first' }, { content: 'second' }] }),
+      ).rejects.toThrow(/receipt/i)
+    })
+
+    it('rejects duplicate receipt indexes instead of guessing their inputs', async () => {
+      const response = addResponse(['created', 'deduplicated'])
+      const receiptItems = (response.receipt as { items: Array<{ inputIndex: number }> }).items
+      receiptItems[1]!.inputIndex = 0
+      const client = new Mnemo({
+        apiKey: 'test',
+        defaultContainerTag: 'user:jane',
+        fetch: fakeFetch(() => json(response)),
+      })
+
+      await expect(
+        client.addMany({ items: [{ content: 'first' }, { content: 'second' }] }),
+      ).rejects.toThrow(/receipt/i)
+    })
+
+    it('retries a timed-out atomic batch when every item has an idempotency key', async () => {
+      let calls = 0
+      const client = new Mnemo({
+        apiKey: 'test',
+        defaultContainerTag: 'user:jane',
+        maxRetries: 1,
+        fetch: fakeFetch(() => {
+          calls += 1
+          if (calls === 1) {
+            const error = new Error('request timed out')
+            error.name = 'AbortError'
+            throw error
+          }
+          return json(addResponse(['created']))
+        }),
+      })
+
+      await expect(
+        client.addMany({
+          items: [{ content: 'safe retry', idempotencyKey: 'import:stable:1' }],
+        }),
+      ).resolves.toMatchObject({ receipt: { status: 'searchable' } })
+      expect(calls).toBe(2)
     })
   })
 
