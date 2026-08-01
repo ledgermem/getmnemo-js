@@ -320,7 +320,7 @@ describe('Mnemo', () => {
             ],
             scope: { type: 'customer', id: 'acme' },
           })
-          return json({ scopeKey: 'customer:acme', items: [] })
+          return json(addResponse(['created']))
         }),
       })
 
@@ -342,7 +342,7 @@ describe('Mnemo', () => {
         fetch: fakeFetch(async (req) => {
           expect(req.headers.get('x-workspace-id')).toBeNull()
           expect(await req.json()).toMatchObject({ enrichmentMode: 'skip' })
-          return json({ scopeKey: 'customer:acme', items: [] })
+          return json(addResponse(['created']))
         }),
       })
 
@@ -376,7 +376,7 @@ describe('Mnemo', () => {
           return json({
             scopeKey: 'customer:acme',
             scope: { type: 'customer', id: 'acme' },
-            items: [],
+            items: [{ id: 'mem_1' }, { id: 'mem_2' }],
             stats: { total: 2, created: 2, deduplicated: 0 },
             receipt: {
               writeId: '22222222-2222-4222-8222-222222222222',
@@ -644,7 +644,7 @@ describe('Mnemo', () => {
               },
             ],
           })
-          return json({ scopeKey: 'user:jane', scope: { type: 'user', id: 'jane' }, items: [] })
+          return json(addResponse(['created']))
         }),
       })
 

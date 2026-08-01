@@ -221,7 +221,7 @@ export class Mnemo {
       throw new Error('Mnemo.addMany: batch size must be between 1 and 100')
     }
     const container = this.#resolveContainer('addMany', input)
-    return this.#request<AddResponse>('POST', '/v1/memories', {
+    const response = await this.#request<unknown>('POST', '/v1/memories', {
       items: input.items,
       ...(input.containerType !== undefined
         ? { containerType: input.containerType }
@@ -232,7 +232,10 @@ export class Mnemo {
         ? { enrichmentMode: input.enrichmentMode }
         : {}),
       ...container,
+    }, {
+      retryTimeout: input.items.every((item) => Boolean(item.idempotencyKey)),
     })
+    return validateAddResponse(response, input.items.length)
   }
 
   /** Start a tenant-bound export for audit, drift checking, or rebuilds. */
@@ -387,7 +390,12 @@ export class Mnemo {
     return this.#defaultContainerTag
   }
 
-  async #request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async #request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    options: { retryTimeout?: boolean } = {},
+  ): Promise<T> {
     const serializedBody = body === undefined ? undefined : JSON.stringify(body)
     let lastErr: unknown
     for (let attempt = 0; attempt <= this.#maxRetries; attempt++) {
@@ -421,6 +429,11 @@ export class Mnemo {
         return parsed as T
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
+          if (options.retryTimeout && attempt < this.#maxRetries) {
+            lastErr = new MnemoTimeoutError(this.#timeoutMs)
+            await sleep(retryDelayMs(attempt))
+            continue
+          }
           throw new MnemoTimeoutError(this.#timeoutMs)
         }
         if (err instanceof MnemoHTTPError) throw err
@@ -436,6 +449,75 @@ export class Mnemo {
     }
     throw lastErr ?? new Error('Mnemo: request failed')
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function invalidReceipt(reason: string): Error {
+  return new Error(`Mnemo.addMany: invalid write receipt (${reason})`)
+}
+
+function validateAddResponse(value: unknown, inputCount: number): AddResponse {
+  if (!isRecord(value)) throw invalidReceipt('response is not an object')
+  if (!Array.isArray(value.items) || value.items.length !== inputCount) {
+    throw invalidReceipt(`expected ${inputCount} returned memories`)
+  }
+
+  const receipt = value.receipt
+  if (!isRecord(receipt) || receipt.status !== 'searchable') {
+    throw invalidReceipt('missing searchable status')
+  }
+  if (typeof receipt.writeId !== 'string' || receipt.writeId.length === 0) {
+    throw invalidReceipt('missing write id')
+  }
+  if (
+    typeof receipt.searchableAt !== 'string' ||
+    Number.isNaN(Date.parse(receipt.searchableAt))
+  ) {
+    throw invalidReceipt('invalid searchable timestamp')
+  }
+  if (!Array.isArray(receipt.items) || receipt.items.length !== inputCount) {
+    throw invalidReceipt(`expected ${inputCount} receipt items`)
+  }
+
+  const seen = new Set<number>()
+  let created = 0
+  let deduplicated = 0
+  for (const item of receipt.items) {
+    if (!isRecord(item)) throw invalidReceipt('receipt item is not an object')
+    const index = item.inputIndex
+    if (
+      typeof index !== 'number' ||
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= inputCount ||
+      seen.has(index)
+    ) {
+      throw invalidReceipt('receipt indexes are incomplete or duplicated')
+    }
+    seen.add(index)
+    if (typeof item.memoryId !== 'string' || item.memoryId.length === 0) {
+      throw invalidReceipt(`item ${index} has no memory id`)
+    }
+    if (item.status === 'created') created += 1
+    else if (item.status === 'deduplicated') deduplicated += 1
+    else throw invalidReceipt(`item ${index} has an unknown status`)
+  }
+
+  if (value.stats !== undefined) {
+    if (!isRecord(value.stats)) throw invalidReceipt('stats are not an object')
+    if (
+      value.stats.total !== inputCount ||
+      value.stats.created !== created ||
+      value.stats.deduplicated !== deduplicated
+    ) {
+      throw invalidReceipt('stats do not match item outcomes')
+    }
+  }
+
+  return value as AddResponse
 }
 
 function safeJson(s: string): unknown {
