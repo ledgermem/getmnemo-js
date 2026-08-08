@@ -20,6 +20,7 @@ export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed'
 export type DocumentStatus = JobStatus
 export type MemoryMutationPolicy = 'standard' | 'privileged'
 export type EnrichmentMode = 'sync' | 'deferred' | 'skip'
+export type YouTubeIngestionMode = 'transcript' | 'transcript_and_visuals'
 
 export type Container = {
   id: string
@@ -367,6 +368,57 @@ export type DeleteDocumentResponse = {
   deleted: true
   forgottenMemories: number
   failedJobs: number
+}
+
+export type YouTubeEstimateInput = {
+  url: string
+  mode: YouTubeIngestionMode
+}
+
+export type CreateYouTubeIngestionInput = YouTubeEstimateInput & {
+  containerTag?: string
+  scope?: Scope
+  customId?: string
+  metadata?: Record<string, unknown>
+}
+
+export type YouTubeQuotaEstimate = {
+  used: number
+  limit: number
+  remaining: number
+  requested: number
+  willFit: boolean
+}
+
+export type YouTubeEstimate = {
+  videoId: string
+  canonicalUrl: string
+  title: string
+  durationSeconds: number
+  durationMinutes: number
+  mode: YouTubeIngestionMode
+  meter: 'youtube_transcript_seconds' | 'youtube_visual_seconds'
+  quota: YouTubeQuotaEstimate
+}
+
+export type YouTubeIngestion = {
+  id: string
+  videoId: string
+  sourceUrl: string
+  title: string
+  durationSeconds: number
+  mode: YouTubeIngestionMode
+  status: JobStatus
+  sourceDocumentId: string
+  jobId: string
+  scopeKey: string
+  scope: Scope
+  transcriptSegmentCount: number
+  visualObservationCount: number
+  error: { code: string | null; message: string | null } | null
+  reused: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export type ProfileStaticFact = {

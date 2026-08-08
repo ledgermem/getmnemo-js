@@ -334,6 +334,64 @@ describe('Mnemo', () => {
     })
   })
 
+  describe('youtube', () => {
+    it('estimates and queues transcript plus visual ingestion in one scope', async () => {
+      const requests: Array<{ path: string; body: unknown }> = []
+      const client = new Mnemo({
+        apiKey: 'test',
+        fetch: fakeFetch(async (req) => {
+          const path = new URL(req.url).pathname
+          const body = await req.json()
+          requests.push({ path, body })
+          if (path.endsWith('/estimate')) {
+            return json({
+              videoId: 'dQw4w9WgXcQ',
+              canonicalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+              title: 'Product walkthrough',
+              durationSeconds: 180,
+              durationMinutes: 3,
+              mode: 'transcript_and_visuals',
+              meter: 'youtube_visual_seconds',
+              quota: {
+                used: 0,
+                limit: 600,
+                remaining: 600,
+                requested: 180,
+                willFit: true,
+              },
+            })
+          }
+          return json({ id: '11111111-1111-4111-8111-111111111111' })
+        }),
+      })
+
+      const input = {
+        url: 'https://youtu.be/dQw4w9WgXcQ',
+        mode: 'transcript_and_visuals' as const,
+      }
+      const estimate = await client.youtube.estimate(input)
+      await client.youtube.create({
+        ...input,
+        scope: { type: 'project', id: 'walkthroughs' },
+      })
+
+      expect(estimate.quota.willFit).toBe(true)
+      expect(requests).toEqual([
+        {
+          path: '/v1/media/youtube/estimate',
+          body: input,
+        },
+        {
+          path: '/v1/media/youtube',
+          body: {
+            ...input,
+            scope: { type: 'project', id: 'walkthroughs' },
+          },
+        },
+      ])
+    })
+  })
+
   describe('addMany', () => {
     it('supports verbatim governed imports without sending a workspace selector', async () => {
       const client = new Mnemo({

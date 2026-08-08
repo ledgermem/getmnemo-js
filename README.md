@@ -258,6 +258,31 @@ for (const item of batch.results) {
 }
 ```
 
+## Ingest YouTube videos
+
+Queue a public YouTube video as a timestamped transcript:
+
+```ts
+const estimate = await mnemo.youtube.estimate({
+  url: 'https://www.youtube.com/watch?v=VIDEO_ID',
+  mode: 'transcript',
+})
+
+if (estimate.quota.willFit) {
+  const video = await mnemo.youtube.create({
+    scope: { type: 'course', id: 'onboarding' },
+    url: estimate.canonicalUrl,
+    mode: 'transcript',
+  })
+
+  await mnemo.jobs.wait(video.jobId)
+}
+```
+
+Use `transcript_and_visuals` when diagrams, interface changes, actions, or
+on-screen text matter. Mnemo stores selected timestamped observations with
+YouTube evidence links; it does not copy or retain the video itself.
+
 ## Read and update memories
 
 ```ts

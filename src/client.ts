@@ -19,7 +19,11 @@
  */
 
 import { MnemoHTTPError, MnemoTimeoutError } from './errors.js'
-import { DocumentsResource, JobsResource } from './resources.js'
+import {
+  DocumentsResource,
+  JobsResource,
+  YouTubeResource,
+} from './resources.js'
 import type {
   AddManyInput,
   AddMemoryInput,
@@ -43,7 +47,7 @@ import type {
 
 const DEFAULT_BASE_URL = 'https://api.mnemohq.com'
 const DEFAULT_TIMEOUT_MS = 30_000
-const SDK_VERSION = '0.4.4'
+const SDK_VERSION = '0.5.0'
 const DEFAULT_SEARCH_LIMIT = 8
 const USER_AGENT = `getmnemo/${SDK_VERSION}`
 const DEFAULT_MAX_RETRIES = 3
@@ -102,6 +106,7 @@ export class Mnemo {
   readonly #defaultContainerTag: string | undefined
   readonly documents: DocumentsResource
   readonly jobs: JobsResource
+  readonly youtube: YouTubeResource
 
   constructor(cfg: ClientConfig) {
     if (!cfg.apiKey) throw new Error('Mnemo: apiKey is required')
@@ -132,6 +137,7 @@ export class Mnemo {
       this.#resolveContainer(method, input)
     this.documents = new DocumentsResource(request, resolveContainer)
     this.jobs = new JobsResource(request)
+    this.youtube = new YouTubeResource(request, resolveContainer)
   }
 
   /**
