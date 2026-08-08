@@ -15,6 +15,10 @@ import type {
   UpdateDocumentInput,
   UpdateDocumentResponse,
   WaitForJobOptions,
+  CreateYouTubeIngestionInput,
+  YouTubeEstimate,
+  YouTubeEstimateInput,
+  YouTubeIngestion,
 } from './types.js'
 
 type Requester = <T>(method: string, path: string, body?: unknown) => Promise<T>
@@ -162,5 +166,38 @@ export class JobsResource {
     }
 
     throw new MnemoTimeoutError(timeoutMs)
+  }
+}
+
+export class YouTubeResource {
+  constructor(
+    private readonly request: Requester,
+    private readonly resolveContainer: ContainerResolver,
+  ) {}
+
+  async estimate(input: YouTubeEstimateInput): Promise<YouTubeEstimate> {
+    return this.request<YouTubeEstimate>(
+      'POST',
+      '/v1/media/youtube/estimate',
+      input,
+    )
+  }
+
+  async create(
+    input: CreateYouTubeIngestionInput,
+  ): Promise<YouTubeIngestion> {
+    const container = this.resolveContainer('youtube.create', input)
+    const { containerTag: _containerTag, scope: _scope, ...video } = input
+    return this.request<YouTubeIngestion>('POST', '/v1/media/youtube', {
+      ...video,
+      ...container,
+    })
+  }
+
+  async get(ingestionId: string): Promise<YouTubeIngestion> {
+    return this.request<YouTubeIngestion>(
+      'GET',
+      `/v1/media/youtube/${encodeURIComponent(ingestionId)}`,
+    )
   }
 }

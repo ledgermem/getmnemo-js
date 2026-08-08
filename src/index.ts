@@ -1,5 +1,9 @@
 export { Mnemo } from './client.js'
-export { DocumentsResource, JobsResource } from './resources.js'
+export {
+  DocumentsResource,
+  JobsResource,
+  YouTubeResource,
+} from './resources.js'
 export {
   MnemoError,
   MnemoHTTPError,
@@ -16,6 +20,7 @@ export type {
   CreateDocumentResponse,
   CreateDocumentsBatchInput,
   CreateDocumentsBatchResponse,
+  CreateYouTubeIngestionInput,
   DeleteDocumentResponse,
   DeleteMemoryOptions,
   DeleteMemoryReceipt,
@@ -54,4 +59,9 @@ export type {
   UpdateMemoryInput,
   WaitForJobOptions,
   WorkspaceExport,
+  YouTubeEstimate,
+  YouTubeEstimateInput,
+  YouTubeIngestion,
+  YouTubeIngestionMode,
+  YouTubeQuotaEstimate,
 } from './types.js'

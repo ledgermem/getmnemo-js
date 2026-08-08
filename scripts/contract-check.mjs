@@ -38,6 +38,9 @@ for (const [path, method] of [
   ['/v1/jobs/{jobId}', 'get'],
   ['/v1/search', 'post'],
   ['/v1/profile', 'post'],
+  ['/v1/media/youtube/estimate', 'post'],
+  ['/v1/media/youtube', 'post'],
+  ['/v1/media/youtube/{id}', 'get'],
 ]) {
   requirePath(spec, path, method)
 }
@@ -64,6 +67,13 @@ requireProperties(spec, 'CreateDocumentDto', [
   'customId',
   'metadata',
   'entityContext',
+])
+requireProperties(spec, 'EstimateYouTubeDto', ['url', 'mode'])
+requireProperties(spec, 'CreateYouTubeIngestionDto', [
+  'url',
+  'mode',
+  'scope',
+  'containerTag',
 ])
 
 const modes = spec.components.schemas.SearchRequestDto.properties.searchMode.enum
